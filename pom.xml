@@ -84,7 +84,7 @@
     <distributionManagement>
         <repository>
             <id>ruiyun</id>
-            <url>http://120.55.99.231:8081/repository/shenjitang-repository/</url>
+            <url>http://nexus.smzen.com:8081/repository/shenjitang-repository/</url>
         </repository>
     </distributionManagement>
 </project>

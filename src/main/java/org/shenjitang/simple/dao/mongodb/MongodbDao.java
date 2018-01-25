@@ -89,24 +89,50 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         mongoDbOperation.remove(dbName, getColName(), new HashMap());
     }
     
+    @Override
+    public T findOne(Object id) throws Exception {
+        HashMap map = new HashMap();
+        map.put("id", id);
+        return (T)mongoDbOperation.findOneObj(dbName, getColName(), map, getT());
+    }
+    
+    @Override
+    public T findOne(String fieldName, Object value) throws Exception {
+        HashMap map = new HashMap();
+        map.put(fieldName, value);
+        return (T)mongoDbOperation.findOneObj(dbName, getColName(), map, getT());
+    }
+
+    
+    @Override
     public T findOne(Map queryMap) throws Exception {
         return (T)mongoDbOperation.findOneObj(dbName, getColName(), queryMap, getT());
     }
     
+    @Override
     public List<T> find(String sql) throws Exception {
         List<Map> list = mongoDbOperation.find(dbName, sql);
         return exchangeList(list);
     }
-    
+
+    @Override
+    public List<T> find(String sql, Object... parameters) throws Exception {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+        
+    @Override
     public T findOne(String sql) throws Exception {
         return (T)mongoDbOperation.findOneObj(dbName, sql, getT());
     }
 
+    @Override
     public List<T> find(Map queryMap) throws Exception {
         List<Map> list = mongoDbOperation.find(dbName, getColName(), queryMap);
         return exchangeList(list);
     }
 
+    @Override
     public List<T> findAll() throws Exception {
         List<Map> list = mongoDbOperation.findAll(dbName, getColName());
         return exchangeList(list);

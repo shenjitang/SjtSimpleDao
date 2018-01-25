@@ -343,6 +343,9 @@ public class NestedBeanProcessor extends BeanProcessor {
             }
             String propertyName = columnToPropertyOverrides.get(columnName);
             if (propertyName == null) {
+                propertyName = columnToPropertyOverrides.get(columnName.toLowerCase());
+            }
+            if (propertyName == null) {
                 propertyName = columnName;
             }
             for (int i = 0; i < props.length; i++) {

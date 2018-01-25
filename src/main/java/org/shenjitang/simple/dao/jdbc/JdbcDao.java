@@ -21,6 +21,7 @@ import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.dbutils.BasicRowProcessor;
 import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.commons.lang.StringUtils;
@@ -42,6 +43,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     protected NestedBeanProcessor processor;
     protected String insertSql;
     protected BeanListHandler listHandler;
+    protected BeanHandler beanHandler;
 
     public JdbcDao() {
         columnToPropertyOverrides = new HashMap();
@@ -62,6 +64,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         }
         processor = new NestedBeanProcessor(columnToPropertyOverrides);
         listHandler = new BeanListHandler<>(entityClass, new BasicRowProcessor(processor));
+        beanHandler = new BeanHandler<>(entityClass, new BasicRowProcessor(processor));
     }
 
     public QueryRunner getQueryRunner() {
@@ -128,6 +131,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
 
        
+    @Override
     public void update(String sql) throws Exception {
         queryRunner.update(sql);
     }
@@ -150,31 +154,55 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
 
     
+    @Override
     public List<T> find(String sql) throws Exception {
         return (List<T>) queryRunner.query(sql, listHandler);
     }
     
+    @Override
+    public List<T> find(String sql, Object... parameters) throws Exception {
+        return (List<T>) queryRunner.query(sql, listHandler, parameters);
+    }
+
+    @Override
     public List<T> find(Map map) throws Exception {
         String sql = "select * from " + getColName() + " where " + createConditionSegment(map);
         return find(sql);
     }
     
-    public T findOne(Map map) throws Exception {
-        List<T> list = find(map);
-        if (list.size() > 0) {
-            return list.get(0);
-        } else {
-            return null;
-        }
+    @Override
+    public T findOne(Object id) throws Exception {
+        String sql = "select * from " + getColName() + " where id='" + id + "'"; 
+        return (T)queryRunner.query(sql, beanHandler);
     }
     
+    @Override
+    public T findOne(String fieldName, Object value) throws Exception {
+        String sql = "select * from " + getColName() + " where " + fieldName + "='" + value + "'"; 
+        return (T)queryRunner.query(sql, beanHandler);
+    }
+
+    @Override
+    public T findOne(Map map) throws Exception {
+        String sql = "select * from " + getColName() + " where " + createConditionSegment(map);
+        return findOne(sql);
+//        List<T> list = find(map);
+//        if (list.size() > 0) {
+//            return list.get(0);
+//        } else {
+//            return null;
+//        }
+    }
+    
+    @Override
     public T findOne(String sql) throws Exception {
-        List<T> list = (List<T>) queryRunner.query(sql, listHandler);
-        if (list != null && list.size() > 0) {
-            return list.get(0);
-        } else {
-            return null;
-        }
+        return (T)queryRunner.query(sql, beanHandler);        
+//        List<T> list = (List<T>) queryRunner.query(sql, listHandler);
+//        if (list != null && list.size() > 0) {
+//            return list.get(0);
+//        } else {
+//            return null;
+//        }
     }
 
     public List<T> findAll() throws Exception {
