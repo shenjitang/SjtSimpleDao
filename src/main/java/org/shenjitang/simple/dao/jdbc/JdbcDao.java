@@ -26,13 +26,15 @@ import org.apache.commons.dbutils.handlers.BeanListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.commons.lang.StringUtils;
 import org.shenjitang.simple.dao.utils.NestedBeanProcessor;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 /**
  *
  * @author xiaolie
  * @param <T>
  */
 public abstract class JdbcDao <T> implements BaseDao<T> {
+    private static final Logger logger = LoggerFactory.getLogger(JdbcDao.class);
     protected QueryRunner  queryRunner;
     protected String dbName;
     protected String colName;
@@ -114,7 +116,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
                 values[i] = processor.getXstream().toXML(values[i]);
             }
         }
-        queryRunner.update(getInsertSql(), values);
+        String sql = getInsertSql();
+        logger.debug(sql);
+        queryRunner.update(sql, values);
     } 
     
     @Override
@@ -127,40 +131,48 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             }
         }
         values[fieldNames.length] = value;
-        queryRunner.update(getUpdateSql(findFiled), values);
+        String sql = getUpdateSql(findFiled);
+        logger.debug(sql);
+        queryRunner.update(sql, values);
     }
 
        
     @Override
     public void update(String sql) throws Exception {
+        logger.debug(sql);
         queryRunner.update(sql);
     }
     
     @Override
     public void remove(String key, String value) throws SQLException {
         String sql = "delete from " + colName + " where " + key + "='" + value + "'";
+        logger.debug(sql);
         queryRunner.update(sql);
     }
     
     public void remove(Map map) throws SQLException {
         String sql = "delete from " + colName + " where " + createConditionSegment(map);
+        logger.debug(sql);
         queryRunner.update(sql);
     }
 
     @Override
     public void removeAll() throws SQLException {
-         String sql = "delete from " + colName;
-         queryRunner.update(sql);
+        String sql = "delete from " + colName;
+        logger.debug(sql);
+        queryRunner.update(sql);
     }
 
     
     @Override
     public List<T> find(String sql) throws Exception {
+        logger.debug(sql);
         return (List<T>) queryRunner.query(sql, listHandler);
     }
     
     @Override
     public List<T> find(String sql, Object... parameters) throws Exception {
+        logger.debug(sql);
         return (List<T>) queryRunner.query(sql, listHandler, parameters);
     }
 
@@ -173,12 +185,14 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     @Override
     public T findOne(Object id) throws Exception {
         String sql = "select * from " + getColName() + " where id='" + id + "'"; 
+        logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler);
     }
     
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
         String sql = "select * from " + getColName() + " where " + fieldName + "='" + value + "'"; 
+        logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler);
     }
 
@@ -196,6 +210,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     @Override
     public T findOne(String sql) throws Exception {
+        logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler);        
 //        List<T> list = (List<T>) queryRunner.query(sql, listHandler);
 //        if (list != null && list.size() > 0) {
@@ -206,13 +221,17 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
 
     public List<T> findAll() throws Exception {
-        return (List<T>) queryRunner.query("select * from " + colName, listHandler);
+        String sql = "select * from " + colName;
+        logger.debug(sql);
+        return (List<T>) queryRunner.query(sql, listHandler);
     }
 
     @Override
     public Long count() throws SQLException{
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        return queryRunner.query("select count(*) as c from " + colName, countHandler);
+        String sql = "select count(*) as c from " + colName;
+        logger.debug(sql);
+        return queryRunner.query(sql, countHandler);
     }
 
 
