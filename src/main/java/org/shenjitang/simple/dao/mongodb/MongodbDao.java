@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -159,6 +160,12 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     public void update(Map findObj, Map setMap) throws Exception {
         mongoDbOperation.update(dbName, getColName(), findObj, setMap);
+    }
+    
+    @Override
+    public void update(T bean) throws Exception {
+        Object id = PropertyUtils.getProperty(bean, "id");
+        update(bean, "id", id);
     }
     
     @Override

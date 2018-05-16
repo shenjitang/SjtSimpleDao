@@ -122,6 +122,12 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     } 
     
     @Override
+    public void update(T bean) throws Exception {
+        Object id = PropertyUtils.getProperty(bean, "id");
+        update(bean, "id", id);
+    }
+    
+    @Override
     public void update(T bean, String findFiled, Object value) throws Exception {
         Object[] values = new Object[fieldNames.length + 1];
         for (int i = 0; i < fieldNames.length; i++) {

@@ -27,4 +27,5 @@ public interface BaseDao<T> {
     public List<T> find(Map map) throws Exception;
     public void update(String sql) throws Exception;
     public void update(T bean, String findFiled, Object value) throws Exception;
+    public void update(T bean) throws Exception;
 }
