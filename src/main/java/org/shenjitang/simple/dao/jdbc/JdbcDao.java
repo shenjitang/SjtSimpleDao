@@ -211,7 +211,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     @Override
     public T findOne(String sql) throws Exception {
         logger.debug(sql);
-        return (T)queryRunner.query(sql, beanHandler);        
+        if (sql.toLowerCase().startsWith("select ")) {
+            return (T)queryRunner.query(sql, beanHandler);
+        } else {
+            String rsql = "select * from " + getColName() + " where id='" + sql + "'"; 
+            logger.debug(rsql);
+            return (T)queryRunner.query(rsql, beanHandler);
+        }     
 //        List<T> list = (List<T>) queryRunner.query(sql, listHandler);
 //        if (list != null && list.size() > 0) {
 //            return list.get(0);
@@ -255,9 +261,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         if (insertSql == null) {
             StringBuilder sb = new StringBuilder();
             StringBuilder tailSb = new StringBuilder("?");
-            sb.append("insert into ").append(colName).append(" (").append(columnNames[0]);
+            sb.append("insert into ").append(colName).append(" (`").append(columnNames[0]).append("`");
             for (int i = 1; i < columnNames.length; i++) {
-                sb.append(", ").append(columnNames[i]);
+                sb.append(", ").append("`").append(columnNames[i]).append("`");
                 tailSb.append(",?");
             }
             sb.append(") values (").append(tailSb).append(")");
