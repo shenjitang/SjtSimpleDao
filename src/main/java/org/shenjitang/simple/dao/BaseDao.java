@@ -17,6 +17,7 @@ public interface BaseDao<T> {
     public void remove(String key, String value) throws Exception;
     public void removeAll() throws Exception;
     public Long count() throws Exception;
+    public Long count(Map map) throws Exception;
     public T findOne(Object id) throws Exception;
     public T findOne(String fieldName, Object value) throws Exception;
     public T findOne(Map map) throws Exception;

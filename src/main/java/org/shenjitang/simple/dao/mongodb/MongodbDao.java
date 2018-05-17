@@ -144,6 +144,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         return  mongoDbOperation.count(dbName,getColName());
     }
 
+    @Override
     public Long count(Map queryMap){
         return  mongoDbOperation.count(dbName,getColName(),queryMap);
     }

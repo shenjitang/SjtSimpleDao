@@ -246,6 +246,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return queryRunner.query(sql, countHandler);
     }
 
+    @Override
+    public Long count(Map map) throws SQLException{
+        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
+        String sql = "select count(*) as c from " + colName + " where " + createConditionSegment(map);
+        logger.debug(sql);
+        return queryRunner.query(sql, countHandler);
+    }
 
     protected List<T> exchangeList(List<Map> list) throws Exception {
         List<T> returnList = new ArrayList();
