@@ -188,11 +188,16 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return find(sql);
     }
     
-    @Override
-    public T findOne(Object id) throws Exception {
+    @Override 
+    public T get(Object id) throws Exception {
         String sql = "select * from " + getColName() + " where id='" + id + "'"; 
         logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler);
+    }
+    
+    @Override
+    public T findOne(Object id) throws Exception {
+        return get(id);
     }
     
     @Override
@@ -206,12 +211,6 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public T findOne(Map map) throws Exception {
         String sql = "select * from " + getColName() + " where " + createConditionSegment(map);
         return findOne(sql);
-//        List<T> list = find(map);
-//        if (list.size() > 0) {
-//            return list.get(0);
-//        } else {
-//            return null;
-//        }
     }
     
     @Override
@@ -224,12 +223,6 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             logger.debug(rsql);
             return (T)queryRunner.query(rsql, beanHandler);
         }     
-//        List<T> list = (List<T>) queryRunner.query(sql, listHandler);
-//        if (list != null && list.size() > 0) {
-//            return list.get(0);
-//        } else {
-//            return null;
-//        }
     }
 
     public List<T> findAll() throws Exception {

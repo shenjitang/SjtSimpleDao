@@ -91,10 +91,15 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     }
     
     @Override
-    public T findOne(Object id) throws Exception {
+    public T get(Object id) throws Exception {
         HashMap map = new HashMap();
         map.put("id", id);
         return (T)mongoDbOperation.findOneObj(dbName, getColName(), map, getT());
+    }
+    
+    @Override
+    public T findOne(Object id) throws Exception {
+        return get(id);
     }
     
     @Override
