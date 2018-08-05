@@ -44,6 +44,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     protected Map<String,String> columnToPropertyOverrides;
     protected NestedBeanProcessor processor;
     protected String insertSql;
+    protected String insertSqlNoId;
     protected BeanListHandler listHandler;
     protected BeanHandler beanHandler;
 
@@ -109,16 +110,46 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     @Override
     public void insert(T bean) throws Exception {
-        Object[] values = new Object[fieldNames.length];
-        for (int i = 0; i < fieldNames.length; i++) {
-            values[i] = PropertyUtils.getProperty(bean, fieldNames[i]);
-            if (values[i] instanceof List) {
-                values[i] = processor.getXstream().toXML(values[i]);
-            }
+        Object id = null;
+        boolean haveId = true;
+        try {
+            id = PropertyUtils.getProperty(bean, "id");
+        } catch (Exception e) {
+            logger.warn("bean 没有id属性", e);
+            haveId = false;
         }
-        String sql = getInsertSql();
-        logger.debug(sql);
-        queryRunner.update(sql, values);
+        if (id != null) {
+            Object[] values = new Object[fieldNames.length];
+            for (int i = 0; i < fieldNames.length; i++) {
+                values[i] = PropertyUtils.getProperty(bean, fieldNames[i]);
+                if (values[i] instanceof List) {
+                    values[i] = processor.getXstream().toXML(values[i]);
+                }
+            }
+            String sql = getInsertSql();
+            logger.debug(sql);
+            queryRunner.update(sql, values);
+        } else {
+            int size = fieldNames.length;
+            if (haveId) {
+                size = fieldNames.length - 1;
+            }
+            Object[] values = new Object[size];
+            int find = 0;
+            for (int i = 0; i < fieldNames.length; i++) {
+                if (!"id".equalsIgnoreCase(fieldNames[i])) {
+                    values[i-find] = PropertyUtils.getProperty(bean, fieldNames[i]);
+                    if (values[i-find] instanceof List) {
+                        values[i-find] = processor.getXstream().toXML(values[i]);
+                    }
+                } else {
+                    find = 1;
+                }
+            }
+            String sql = getInsertSqlNoId();
+            logger.debug(sql);
+            queryRunner.update(sql, values);
+        }
     } 
     
     @Override
@@ -278,6 +309,23 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return insertSql;
     }
     
+    protected String getInsertSqlNoId() {
+        if (insertSqlNoId == null) {
+            StringBuilder sb = new StringBuilder();
+            StringBuilder tailSb = new StringBuilder("?");
+            sb.append("insert into ").append(colName).append(" (`").append(columnNames[0]).append("`");
+            for (int i = 1; i < columnNames.length; i++) {
+                if (!"id".equalsIgnoreCase(columnNames[i])) {
+                    sb.append(", ").append("`").append(columnNames[i]).append("`");
+                    tailSb.append(",?");
+                }
+            }
+            sb.append(") values (").append(tailSb).append(")");
+            insertSqlNoId = sb.toString();
+        }
+        return insertSqlNoId;
+    }
+
     protected String getUpdateSql(String findField) {
         StringBuilder sb = new StringBuilder();
         sb.append("update ").append(colName).append(" set ").append(columnNames[0]).append("=?");

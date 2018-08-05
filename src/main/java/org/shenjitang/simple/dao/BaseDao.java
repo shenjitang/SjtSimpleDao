@@ -22,7 +22,7 @@ public interface BaseDao<T> {
     public T findOne(Object id) throws Exception;
     public T findOne(String fieldName, Object value) throws Exception;
     public T findOne(Map map) throws Exception;
-    public T findOne(String sql) throws Exception;
+    public T findOne(String sql) throws Exception;      
     public List<T> findAll() throws Exception;
     public List<T> find(String sql) throws Exception;
     public List<T> find(String sql, Object... parameters) throws Exception;
