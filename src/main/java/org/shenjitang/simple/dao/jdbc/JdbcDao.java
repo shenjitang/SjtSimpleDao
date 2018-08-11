@@ -182,20 +182,20 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     @Override
     public void remove(String key, String value) throws SQLException {
-        String sql = "delete from " + colName + " where " + key + "='" + value + "'";
+        String sql = "delete from " + getColName() + " where " + key + "='" + value + "'";
         logger.debug(sql);
         queryRunner.update(sql);
     }
     
     public void remove(Map map) throws SQLException {
-        String sql = "delete from " + colName + " where " + createConditionSegment(map);
+        String sql = "delete from " + getColName() + " where " + createConditionSegment(map);
         logger.debug(sql);
         queryRunner.update(sql);
     }
 
     @Override
     public void removeAll() throws SQLException {
-        String sql = "delete from " + colName;
+        String sql = "delete from " + getColName();
         logger.debug(sql);
         queryRunner.update(sql);
     }
@@ -257,7 +257,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
 
     public List<T> findAll() throws Exception {
-        String sql = "select * from " + colName;
+        String sql = "select * from " + getColName();
         logger.debug(sql);
         return (List<T>) queryRunner.query(sql, listHandler);
     }
@@ -265,7 +265,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     @Override
     public Long count() throws SQLException{
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        String sql = "select count(*) as c from " + colName;
+        String sql = "select count(*) as c from " + getColName();
         logger.debug(sql);
         return queryRunner.query(sql, countHandler);
     }
@@ -273,7 +273,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     @Override
     public Long count(Map map) throws SQLException{
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        String sql = "select count(*) as c from " + colName + " where " + createConditionSegment(map);
+        String sql = "select count(*) as c from " + getColName() + " where " + createConditionSegment(map);
         logger.debug(sql);
         return queryRunner.query(sql, countHandler);
     }
@@ -298,7 +298,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         if (insertSql == null) {
             StringBuilder sb = new StringBuilder();
             StringBuilder tailSb = new StringBuilder("?");
-            sb.append("insert into ").append(colName).append(" (`").append(columnNames[0]).append("`");
+            sb.append("insert into ").append(getColName()).append(" (`").append(columnNames[0]).append("`");
             for (int i = 1; i < columnNames.length; i++) {
                 sb.append(", ").append("`").append(columnNames[i]).append("`");
                 tailSb.append(",?");
@@ -313,7 +313,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         if (insertSqlNoId == null) {
             StringBuilder sb = new StringBuilder();
             StringBuilder tailSb = new StringBuilder("?");
-            sb.append("insert into ").append(colName).append(" (`").append(columnNames[0]).append("`");
+            sb.append("insert into ").append(getColName()).append(" (`").append(columnNames[0]).append("`");
             for (int i = 1; i < columnNames.length; i++) {
                 if (!"id".equalsIgnoreCase(columnNames[i])) {
                     sb.append(", ").append("`").append(columnNames[i]).append("`");
@@ -328,7 +328,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
 
     protected String getUpdateSql(String findField) {
         StringBuilder sb = new StringBuilder();
-        sb.append("update ").append(colName).append(" set ").append(columnNames[0]).append("=?");
+        sb.append("update ").append(getColName()).append(" set ").append(columnNames[0]).append("=?");
         for (int i = 1; i < columnNames.length; i++) {
             sb.append(", ").append(columnNames[i]).append("=?");
         }
