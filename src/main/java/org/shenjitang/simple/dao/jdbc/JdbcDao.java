@@ -115,7 +115,8 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         try {
             id = PropertyUtils.getProperty(bean, "id");
         } catch (Exception e) {
-            logger.warn("bean 没有id属性", e);
+            logger.info("bean 没有id属性");
+            //logger.warn("bean 没有id属性", e);
             haveId = false;
         }
         if (id != null) {
@@ -238,6 +239,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return (T)queryRunner.query(sql, beanHandler);
     }
 
+    public T findOne(String fieldName1, Object value1, String fieldName2, Object value2) throws Exception {
+        String sql = "select * from " + getColName() + " where " + 
+                fieldName1 + "=? and " + fieldName2 + "=?"; 
+        logger.debug(sql);
+        return (T)queryRunner.query(sql, beanHandler, value1, value2);
+    }
+
     @Override
     public T findOne(Map map) throws Exception {
         String sql = "select * from " + getColName() + " where " + createConditionSegment(map);
@@ -276,6 +284,20 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         String sql = "select count(*) as c from " + getColName() + " where " + createConditionSegment(map);
         logger.debug(sql);
         return queryRunner.query(sql, countHandler);
+    }
+    
+    public Long count(String field, Object value) throws SQLException {
+        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
+        String sql = "select count(*) as c from " + getColName() + " where " + field + "=?";
+        logger.debug(sql);
+        return queryRunner.query(sql, countHandler, value);
+    }
+
+    public Long count(String field1, Object value1, String field2, Object value2) throws SQLException {
+        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
+        String sql = "select count(*) as c from " + getColName() + " where " + field1 + "=? and " + field2 + "=?";
+        logger.debug(sql);
+        return queryRunner.query(sql, countHandler, value1, value2);
     }
 
     protected List<T> exchangeList(List<Map> list) throws Exception {
