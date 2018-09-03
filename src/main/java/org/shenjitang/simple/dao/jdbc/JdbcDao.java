@@ -174,6 +174,20 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         queryRunner.update(sql, values);
     }
 
+    public void update(T bean, String findFiled, Object value, String findFiled2, Object value2) throws Exception {
+        Object[] values = new Object[fieldNames.length + 2];
+        for (int i = 0; i < fieldNames.length; i++) {
+            values[i] = PropertyUtils.getProperty(bean, fieldNames[i]);
+            if (values[i] instanceof List) {
+                values[i] = processor.getXstream().toXML(values[i]);
+            }
+        }
+        values[fieldNames.length] = value;
+        values[fieldNames.length + 1] = value2;
+        String sql = getUpdateSql(findFiled,findFiled2);
+        logger.debug(sql);
+        queryRunner.update(sql, values);
+    }
        
     @Override
     public void update(String sql) throws Exception {
@@ -355,6 +369,16 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             sb.append(", ").append(columnNames[i]).append("=?");
         }
         sb.append(" where ").append(findField).append("=?");
+        return sb.toString();
+    }
+
+    protected String getUpdateSql(String findField, String findField2) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("update ").append(getColName()).append(" set ").append(columnNames[0]).append("=?");
+        for (int i = 1; i < columnNames.length; i++) {
+            sb.append(", ").append(columnNames[i]).append("=?");
+        }
+        sb.append(" where ").append(findField).append("=? and ").append(findField2).append("=?");
         return sb.toString();
     }
 
