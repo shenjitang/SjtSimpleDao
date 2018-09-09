@@ -15,6 +15,7 @@ import java.util.Map;
 public interface BaseDao<T> {
     public void insert(T bean) throws Exception;
     public void remove(String key, String value) throws Exception;
+    public void remove(Object id) throws Exception;
     public void removeAll() throws Exception;
     public Long count() throws Exception;
     public Long count(Map map) throws Exception;

@@ -86,6 +86,13 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     }
     
     @Override
+    public void remove(Object id) {
+        Map map = new HashMap();
+        map.put("id", id);
+        remove(map);
+    }
+
+    @Override
     public void removeAll() {
         mongoDbOperation.remove(dbName, getColName(), new HashMap());
     }

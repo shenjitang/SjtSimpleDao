@@ -202,6 +202,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         queryRunner.update(sql);
     }
     
+    @Override
+    public void remove(Object id) throws SQLException {
+        String sql = "delete from " + getColName() + " where id=?";
+        logger.debug(sql);
+        queryRunner.update(sql, id);
+    }
+    
     public void remove(Map map) throws SQLException {
         String sql = "delete from " + getColName() + " where " + createConditionSegment(map);
         logger.debug(sql);
