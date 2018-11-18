@@ -128,7 +128,11 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
                 }
             }
             String sql = getInsertSql();
-            logger.debug(sql);
+            StringBuilder sb = new StringBuilder();
+            for (Object v : values) {
+                sb.append(v).append(" ");
+            }
+            logger.debug(sql + " \n params: " + sb.toString());
             queryRunner.update(sql, values);
         } else {
             int size = fieldNames.length;
@@ -148,7 +152,11 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
                 }
             }
             String sql = getInsertSqlNoId();
-            logger.debug(sql);
+            StringBuilder sb = new StringBuilder();
+            for (Object v : values) {
+                sb.append(v).append(" ");
+            }
+            logger.debug(sql + " \n params: " + sb.toString());
             queryRunner.update(sql, values);
         }
     } 
@@ -157,6 +165,22 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public void update(T bean) throws Exception {
         Object id = PropertyUtils.getProperty(bean, "id");
         update(bean, "id", id);
+    }
+    
+    public void update(T bean, Map map) throws Exception {
+        Object id = PropertyUtils.getProperty(bean, "id");
+        List fields = new ArrayList();
+        List values = new ArrayList();
+        for (int i = 0; i < fieldNames.length; i++) {
+            if (map.containsKey(fieldNames[i])) {
+                fields.add(columnNames[i]);
+                values.add(map.get(fieldNames[i]));
+            }
+        }
+        String sql = getUpdateSql("id", fields);
+        logger.debug(sql);
+        values.add(id);
+        queryRunner.update(sql, values.toArray());
     }
     
     @Override
@@ -374,6 +398,16 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         sb.append("update ").append(getColName()).append(" set ").append(columnNames[0]).append("=?");
         for (int i = 1; i < columnNames.length; i++) {
             sb.append(", ").append(columnNames[i]).append("=?");
+        }
+        sb.append(" where ").append(findField).append("=?");
+        return sb.toString();
+    }
+
+    protected String getUpdateSql(String findField, List fields) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("update ").append(getColName()).append(" set ").append(fields.get(0)).append("=?");
+        for (int i = 1; i < fields.size(); i++) {
+            sb.append(", ").append(fields.get(i)).append("=?");
         }
         sb.append(" where ").append(findField).append("=?");
         return sb.toString();

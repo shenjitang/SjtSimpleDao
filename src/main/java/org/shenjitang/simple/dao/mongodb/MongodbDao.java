@@ -6,9 +6,8 @@
 
 package org.shenjitang.simple.dao.mongodb;
 
-import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import org.shenjitang.simple.dao.BaseDao;
-import com.mongodb.DBObject;
 import org.shenjitang.simple.dao.utils.CamelUnderLineUtils;
 import org.shenjitang.mongodbutils.MongoDbOperater;
 import java.lang.reflect.ParameterizedType;
@@ -20,6 +19,7 @@ import java.util.Map;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang.StringUtils;
+import org.bson.Document;
 
 /**
  *
@@ -111,9 +111,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
-        HashMap map = new HashMap();
-        map.put(fieldName, value);
-        return (T)mongoDbOperation.findOneObj(dbName, getColName(), map, getT());
+        return (T)mongoDbOperation.findOneObj(dbName, getColName(), Filters.eq(fieldName, value), getT());
     }
 
     
@@ -124,13 +122,14 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public List<T> find(String sql) throws Exception {
-        List<Map> list = mongoDbOperation.find(dbName, sql);
+        List<Document> list = mongoDbOperation.find(dbName, sql);
         return exchangeList(list);
     }
 
     @Override
     public List<T> find(String sql, Object... parameters) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        List<Document> list = mongoDbOperation.find(dbName, sql, parameters);
+        return exchangeList(list);
     }
 
         
@@ -141,13 +140,13 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
 
     @Override
     public List<T> find(Map queryMap) throws Exception {
-        List<Map> list = mongoDbOperation.find(dbName, getColName(), queryMap);
+        List<Document> list = mongoDbOperation.find(dbName, getColName(), queryMap);
         return exchangeList(list);
     }
 
     @Override
     public List<T> findAll() throws Exception {
-        List<Map> list = mongoDbOperation.findAll(dbName, getColName());
+        List<Document> list = mongoDbOperation.findAll(dbName, getColName());
         return exchangeList(list);
     }
 
@@ -161,9 +160,9 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         return  mongoDbOperation.count(dbName,getColName(),queryMap);
     }
 
-    protected List<T> exchangeList(List<Map> list) throws Exception {
+    protected List<T> exchangeList(List<Document> list) throws Exception {
         List<T> returnList = new ArrayList();
-        for (Map map : list) {
+        for (Document map : list) {
             T bean = (T)getT().newInstance();
             BeanUtils.populate(bean, map);
             returnList.add(bean);
@@ -183,10 +182,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public void update(T bean, String findField, Object value) throws Exception {
-        Map findMap = new HashMap();
-        findMap.put(findField, value);
-        DBObject findObj = new BasicDBObject(findMap);
-        mongoDbOperation.update(dbName, colName, findObj, bean);
+        mongoDbOperation.update(dbName, colName, Filters.eq(findField, value), bean);
     }
     
     @Override

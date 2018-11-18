@@ -67,7 +67,7 @@
         <dependency>
             <groupId>org.shenjitang</groupId>
             <artifactId>MongoDBUtils</artifactId>
-            <version>1.1</version>
+            <version>2.1</version>
         </dependency>
         <dependency>
             <groupId>commons-lang</groupId>
