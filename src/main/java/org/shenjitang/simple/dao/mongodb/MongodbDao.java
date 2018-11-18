@@ -190,6 +190,10 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         mongoDbOperation.update(dbName, sql);
     }
     
+    public void update(Map map ,String findField, Object findValue) throws Exception {
+        mongoDbOperation.update(dbName, dbName, Filters.eq(findField, findValue), map);
+    }
+    
     protected Class getGenericType(int index) {
         Type genType = getClass().getGenericSuperclass();
         if (!(genType instanceof ParameterizedType)) {

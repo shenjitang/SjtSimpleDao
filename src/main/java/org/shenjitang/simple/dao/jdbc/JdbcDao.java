@@ -167,8 +167,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         update(bean, "id", id);
     }
     
-    public void update(T bean, Map map) throws Exception {
-        Object id = PropertyUtils.getProperty(bean, "id");
+    public void update(Map map, String findField, String findValue) throws Exception {
         List fields = new ArrayList();
         List values = new ArrayList();
         for (int i = 0; i < fieldNames.length; i++) {
@@ -177,9 +176,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
                 values.add(map.get(fieldNames[i]));
             }
         }
-        String sql = getUpdateSql("id", fields);
+        String sql = getUpdateSql(findField, fields);
         logger.debug(sql);
-        values.add(id);
+        values.add(findValue);
         queryRunner.update(sql, values.toArray());
     }
     
