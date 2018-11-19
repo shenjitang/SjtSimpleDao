@@ -167,7 +167,8 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         update(bean, "id", id);
     }
     
-    public void update(Map map, String findField, String findValue) throws Exception {
+    @Override
+    public void update(Map map, String findField, Object findValue) throws Exception {
         List fields = new ArrayList();
         List values = new ArrayList();
         for (int i = 0; i < fieldNames.length; i++) {

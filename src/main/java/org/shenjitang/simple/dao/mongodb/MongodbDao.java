@@ -190,6 +190,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         mongoDbOperation.update(dbName, sql);
     }
     
+    @Override
     public void update(Map map ,String findField, Object findValue) throws Exception {
         mongoDbOperation.update(dbName, dbName, Filters.eq(findField, findValue), map);
     }
