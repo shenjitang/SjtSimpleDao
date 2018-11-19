@@ -99,9 +99,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public T get(Object id) throws Exception {
-        HashMap map = new HashMap();
-        map.put("id", id);
-        return (T)mongoDbOperation.findOneObj(dbName, getColName(), map, getT());
+        return (T)mongoDbOperation.findOneObj(dbName, getColName(), Filters.eq("_id", id), getT());
     }
     
     @Override
@@ -192,9 +190,17 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public void update(Map map ,String findField, Object findValue) throws Exception {
-        mongoDbOperation.update(dbName, dbName, Filters.eq(findField, findValue), map);
+        mongoDbOperation.update(dbName, colName, Filters.eq(findField, findValue), map);
     }
     
+    public void updateOne(Map map ,String findField, Object findValue) throws Exception {
+        mongoDbOperation.updateOne(dbName, colName, Filters.eq(findField, findValue), map);
+    }
+
+    public void updateById(Map map ,Object id) throws Exception {
+        mongoDbOperation.updateOne(dbName, colName, Filters.eq("_id", id), map);
+    }
+
     protected Class getGenericType(int index) {
         Type genType = getClass().getGenericSuperclass();
         if (!(genType instanceof ParameterizedType)) {
