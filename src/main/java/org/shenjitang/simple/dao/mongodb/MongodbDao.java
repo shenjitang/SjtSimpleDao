@@ -120,14 +120,12 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public List<T> find(String sql) throws Exception {
-        List<Document> list = mongoDbOperation.find(dbName, sql);
-        return exchangeList(list);
+        return mongoDbOperation.find(getT(), dbName, sql);
     }
 
     @Override
     public List<T> find(String sql, Object... parameters) throws Exception {
-        List<Document> list = mongoDbOperation.find(dbName, sql, parameters);
-        return exchangeList(list);
+        return mongoDbOperation.find(getT(), dbName, sql, parameters);
     }
 
         
@@ -138,8 +136,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
 
     @Override
     public List<T> find(Map queryMap) throws Exception {
-        List<Document> list = mongoDbOperation.find(dbName, getColName(), queryMap);
-        return exchangeList(list);
+        return mongoDbOperation.find2(getT(), dbName, colName, getColName(), queryMap);
     }
 
     @Override
