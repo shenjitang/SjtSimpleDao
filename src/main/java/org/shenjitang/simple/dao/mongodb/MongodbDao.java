@@ -99,7 +99,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public T get(Object id) throws Exception {
-        return (T)mongoDbOperation.findOneObj(dbName, getColName(), Filters.eq("_id", id), getT());
+        return (T)mongoDbOperation.findOne(getT(), dbName, getColName(), Filters.eq("_id", id));
     }
     
     @Override
@@ -109,13 +109,13 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
-        return (T)mongoDbOperation.findOneObj(dbName, getColName(), Filters.eq(fieldName, value), getT());
+        return (T)mongoDbOperation.findOne(getT(), dbName, getColName(), Filters.eq(fieldName, value));
     }
 
     
     @Override
     public T findOne(Map queryMap) throws Exception {
-        return (T)mongoDbOperation.findOneObj(dbName, getColName(), queryMap, getT());
+        return (T)mongoDbOperation.findOne(getT(), dbName, getColName(), queryMap);
     }
     
     @Override
@@ -131,12 +131,12 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         
     @Override
     public T findOne(String sql) throws Exception {
-        return (T)mongoDbOperation.findOneObj(dbName, sql, getT());
+        return (T)mongoDbOperation.findOne(getT(), dbName, sql);
     }
 
     @Override
     public List<T> find(Map queryMap) throws Exception {
-        return mongoDbOperation.find2(getT(), dbName, colName, getColName(), queryMap);
+        return mongoDbOperation.findByKeyValue(getT(), dbName, colName, getColName(), queryMap);
     }
 
     @Override
@@ -177,7 +177,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public void update(T bean, String findField, Object value) throws Exception {
-        mongoDbOperation.update(dbName, colName, Filters.eq(findField, value), bean);
+        mongoDbOperation.updateByBean(dbName, colName, Filters.eq(findField, value), bean);
     }
     
     @Override
