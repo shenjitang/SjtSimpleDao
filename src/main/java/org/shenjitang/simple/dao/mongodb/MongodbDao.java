@@ -29,7 +29,7 @@ import org.bson.Document;
 public abstract class MongodbDao <T> implements BaseDao<T> {
     protected MongoDbOperater mongoDbOperation;
     protected String dbName;
-    private String colName;
+    protected String colName;
 
     public MongodbDao() {
     }
