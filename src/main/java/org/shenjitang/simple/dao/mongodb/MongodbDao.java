@@ -6,6 +6,8 @@
 
 package org.shenjitang.simple.dao.mongodb;
 
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import org.shenjitang.simple.dao.BaseDao;
 import org.shenjitang.simple.dao.utils.CamelUnderLineUtils;
@@ -30,8 +32,20 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     protected MongoDbOperater mongoDbOperation;
     protected String dbName;
     protected String colName;
+    private Class tClazz;
 
     public MongodbDao() {
+    }
+    
+    public MongoDatabase getDatabase() {
+        return mongoDbOperation.getDatabase(dbName);
+    }
+    
+    public MongoCollection getCollection() {
+        return getDatabase().getCollection(getColName());
+    }
+    public MongoCollection getTypedCollection() {
+        return getDatabase().getCollection(getColName(), getT());
     }
 
     public MongoDbOperater getMongoDbOperation() {
@@ -59,11 +73,9 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     protected String getColName(T bean) {
         if (StringUtils.isBlank(colName)) {
-            return CamelUnderLineUtils.camelToUnderline(bean.getClass().getSimpleName());
-        } else {
-            return colName;
+            colName = CamelUnderLineUtils.camelToUnderline(bean.getClass().getSimpleName());
         }
-        
+        return colName;
     }
 
     public void setColName(String colName) {
@@ -214,6 +226,9 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     }
     
     public Class getT() {
-        return getGenericType(0);
+        if (tClazz == null) {
+            tClazz = getGenericType(0);
+        }
+        return tClazz;
     }
 }
