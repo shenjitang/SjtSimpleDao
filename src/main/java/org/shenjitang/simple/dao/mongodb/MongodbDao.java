@@ -100,7 +100,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     @Override
     public void remove(Object id) {
         Map map = new HashMap();
-        map.put("id", id);
+        map.put("_id", id);
         remove(map);
     }
 
@@ -184,7 +184,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     @Override
     public void update(T bean) throws Exception {
         Object id = PropertyUtils.getProperty(bean, "id");
-        update(bean, "id", id);
+        update(bean, "_id", id);
     }
     
     @Override
