@@ -248,7 +248,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
 
     
     @Override
-    public List<T> find(String sql) throws Exception {
+    public List<T> find(String sql) throws SQLException {
         logger.debug(sql);
         return (List<T>) queryRunner.query(sql, listHandler);
     }
@@ -260,7 +260,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
 
     @Override
-    public List<T> find(Map map) throws Exception {
+    public List<T> find(Map map) throws SQLException {
         String sql = "select * from " + getColName() + " where " + createConditionSegment(map);
         return find(sql);
     }
