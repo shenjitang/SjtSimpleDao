@@ -60,7 +60,11 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
                 continue;
             }
             fieldNames[i] = pd.getName();
-            columnNames[i] =  CamelUnderLineUtils.camelToUnderline(fieldNames[i]);
+            if (isNnderlineFieldName()) {
+                columnNames[i] =  CamelUnderLineUtils.camelToUnderline(fieldNames[i]);
+            } else {
+                columnNames[i] = fieldNames[i];
+            }
             //columnNames[i] = fieldNames[i];
             columnToPropertyOverrides.put(columnNames[i], fieldNames[i]);
             i++;
@@ -279,14 +283,14 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
-        String sql = "select * from " + getColName() + " where " + fieldName + "='" + value + "'"; 
+        String sql = "select * from " + getColName() + " where " + amendFieldName(fieldName) + "='" + value + "'"; 
         logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler);
     }
 
     public T findOne(String fieldName1, Object value1, String fieldName2, Object value2) throws Exception {
         String sql = "select * from " + getColName() + " where " + 
-                fieldName1 + "=? and " + fieldName2 + "=?"; 
+                amendFieldName(fieldName1) + "=? and " + amendFieldName(fieldName2) + "=?"; 
         logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler, value1, value2);
     }
@@ -308,11 +312,32 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             return (T)queryRunner.query(rsql, beanHandler);
         }     
     }
+    
+    public List<T> find(String fieldName, Object value) throws Exception {
+        String sql = "select * from " + getColName() + " where " + amendFieldName(fieldName) + "='" + value + "'";
+        logger.debug(sql);
+        return (List<T>) queryRunner.query(sql, listHandler);
+    }
+    public List<T> findNotEquals(String fieldName, Object value) throws Exception {
+        String sql = "select * from " + getColName() + " where " + amendFieldName(fieldName) + "!='" + value + "'";
+        logger.debug(sql);
+        return (List<T>) queryRunner.query(sql, listHandler);
+    }
 
     public List<T> findAll() throws Exception {
         String sql = "select * from " + getColName();
         logger.debug(sql);
         return (List<T>) queryRunner.query(sql, listHandler);
+    }
+    public List<T> findAllExcludeDeleted() throws Exception {
+        String field = JdbcDaoConfig.getConfig().getLogicalDelField();
+        String value = JdbcDaoConfig.getConfig().getLogicalDelMark();
+        if (value.equalsIgnoreCase("true")) {
+            value = JdbcDaoConfig.getConfig().getTrueMapping();
+        } else if (value.equalsIgnoreCase("false")) {
+            value = JdbcDaoConfig.getConfig().getFalseMapping();
+        }
+        return findNotEquals(field, value);
     }
 
     @Override
@@ -321,6 +346,17 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         String sql = "select count(*) as c from " + getColName();
         logger.debug(sql);
         return queryRunner.query(sql, countHandler);
+    }
+    
+    public Long countExcludeDeleted() throws Exception {
+        String field = JdbcDaoConfig.getConfig().getLogicalDelField();
+        String value = JdbcDaoConfig.getConfig().getLogicalDelMark();
+        if (value.equalsIgnoreCase("true")) {
+            value = JdbcDaoConfig.getConfig().getTrueMapping();
+        } else if (value.equalsIgnoreCase("false")) {
+            value = JdbcDaoConfig.getConfig().getFalseMapping();
+        }
+        return countNotEquals(field, value);
     }
 
     @Override
@@ -334,6 +370,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public Long count(String field, Object value) throws SQLException {
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
         String sql = "select count(*) as c from " + getColName() + " where " + field + "=?";
+        logger.debug(sql);
+        return queryRunner.query(sql, countHandler, value);
+    }
+
+    public Long countNotEquals(String field, Object value) throws SQLException {
+        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
+        String sql = "select count(*) as c from " + getColName() + " where " + field + "!=?";
         logger.debug(sql);
         return queryRunner.query(sql, countHandler, value);
     }
@@ -433,5 +476,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             sb.append(key.toString()).append("='").append(map.get(key).toString()).append("'");
         }
         return sb.toString();
+    }
+    
+    private boolean isNnderlineFieldName() {
+        return JdbcDaoConfig.getConfig().getFieldNameSplit() == JdbcDaoConfig.NAME_SPLIT_UNDERLINE;
+    }
+    private String amendFieldName(String name) {
+        //return isNnderlineFieldName()? CamelUnderLineUtils.camelToUnderline(name) : name;
+        return columnToPropertyOverrides.get(name);
     }
 }
