@@ -18,8 +18,8 @@ public class JdbcDaoConfig {
     private String falseMapping = "0";
     private String tableNameSplit = NAME_SPLIT_UNDERLINE;
     private String fieldNameSplit = NAME_SPLIT_UNDERLINE;
-    private String logicalDelField = "deleted";
-    private String logicalDelMark = "1";
+    private String delMarkFieldName = "deleted";
+    private String delMarkFieldValue = "1";
     private static JdbcDaoConfig config;
     
     public static JdbcDaoConfig getConfig() {
@@ -89,19 +89,20 @@ public class JdbcDaoConfig {
         this.name = name;
     }
 
-    public String getLogicalDelField() {
-        return logicalDelField;
+    public String getDelMarkFieldName() {
+        return delMarkFieldName;
     }
 
-    public void setLogicalDelField(String logicalDelField) {
-        this.logicalDelField = logicalDelField;
+    public void setDelMarkFieldName(String delMarkFieldName) {
+        this.delMarkFieldName = delMarkFieldName;
     }
 
-    public String getLogicalDelMark() {
-        return logicalDelMark;
+    public String getDelMarkFieldValue() {
+        return delMarkFieldValue;
     }
 
-    public void setLogicalDelMark(String logicalDelMark) {
-        this.logicalDelMark = logicalDelMark;
+    public void setDelMarkFieldValue(String delMarkFieldValue) {
+        this.delMarkFieldValue = delMarkFieldValue;
     }
+
 }
