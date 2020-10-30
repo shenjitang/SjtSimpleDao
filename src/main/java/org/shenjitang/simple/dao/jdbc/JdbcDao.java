@@ -34,8 +34,6 @@ import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.commons.lang.StringUtils;
-import org.shenjitang.common.util.RegularExpressionUtils;
-import org.shenjitang.common.util.StringUtilEx;
 import org.shenjitang.simple.dao.PageDataResult;
 import org.shenjitang.simple.dao.utils.NestedBeanProcessor;
 import org.slf4j.Logger;
@@ -288,7 +286,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     public PageDataResult<T> find(int offset, int limit, String sql) throws SQLException {
         Long count = count(sql);
-        sql += " limit " + offset + ", " + limit;
+        if (offset >= 0) {
+            sql += " limit " + offset + ", " + limit;
+        }
         List<T> data = find(sql);
         return new PageDataResult(count, offset, data);
     }
@@ -301,7 +301,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     public PageDataResult<T> find(int offset, int limit, String sql, Object... parameters) throws Exception {
         Long count = count(sql);
-        sql += " limit " + offset + ", " + limit;
+        if (offset >= 0) {
+            sql += " limit " + offset + ", " + limit;
+        }
         logger.debug(sql);
         List<T> data = (List<T>)queryRunner.query(sql, listHandler, parameters);
         return new PageDataResult(count, offset, data);
@@ -311,7 +313,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public List<T> find(Map map) throws SQLException {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + createConditionSegment(map);
         if (logicDeleted && !map.containsKey(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         return find(sql);
     }
@@ -319,7 +321,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public PageDataResult<T> find(int offset, int limit, Map map) throws SQLException {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + createConditionSegment(map);
         if (logicDeleted && !map.containsKey(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         return find(offset, limit, sql);
     }
@@ -340,7 +342,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public T findOne(String fieldName, Object value) throws Exception {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + amendFieldName(fieldName) + "='" + value + "'"; 
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler);
@@ -350,7 +352,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + 
                 amendFieldName(fieldName1) + "=? and " + amendFieldName(fieldName2) + "=?"; 
         if (logicDeleted && !fieldName1.equals(getDelMarkFieldName()) && !fieldName2.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler, value1, value2);
@@ -360,7 +362,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public T findOne(Map map) throws Exception {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + createConditionSegment(map);
         if (logicDeleted && !map.containsKey(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }        
         return findOne(sql);
     }
@@ -380,7 +382,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public List<T> find(String fieldName, Object value) throws Exception {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + amendFieldName(fieldName) + "='" + value + "'";
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return (List<T>) queryRunner.query(sql, listHandler);
@@ -389,10 +391,12 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public PageDataResult<T> find(int offset, int limit, String fieldName, Object value) throws Exception {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + amendFieldName(fieldName) + "='" + value + "'";
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         Long count = count(sql);
-        sql += " limit " + offset + ", " + limit;
+        if (offset >= 0) {
+            sql += " limit " + offset + ", " + limit;
+        }
         logger.debug(sql);
         List<T> data = (List < T >)queryRunner.query(sql, listHandler);
         return new PageDataResult<T>(count, offset, data);
@@ -401,7 +405,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public List<T> findNotEquals(String fieldName, Object value) throws Exception {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + amendFieldName(fieldName) + "!='" + value + "'";
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return (List<T>) queryRunner.query(sql, listHandler);
@@ -410,10 +414,12 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public PageDataResult<T> findNotEquals(int offset, int limit, String fieldName, Object value) throws Exception {
         String sql = "select * from " + JdbcDao.this.getTableName() + " where " + amendFieldName(fieldName) + "!='" + value + "'";
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         Long count = count(sql);
-        sql += " limit " + offset + ", " + limit;
+        if (offset >= 0) {
+            sql += " limit " + offset + ", " + limit;
+        }
         logger.debug(sql);
         List<T> data = (List < T >)queryRunner.query(sql, listHandler);
         return new PageDataResult<T>(count, offset, data);
@@ -433,7 +439,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
                 " where " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'":
             "select * from " + JdbcDao.this.getTableName();
         Long count = count(sql);
-        sql += " limit " + offset + ", " + limit;
+        if (offset >= 0) {
+            sql += " limit " + offset + ", " + limit;
+        }
         logger.debug(sql);
         List<T> data = (List < T >)queryRunner.query(sql, listHandler);
         return new PageDataResult<T>(count, offset, data);
@@ -453,7 +461,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         if (includeDeleted) {
             String sql = "select * from " + JdbcDao.this.getTableName();
             Long count = count(sql);
-            sql += " limit " + offset + ", " + limit;
+            if (offset >= 0) {
+                sql += " limit " + offset + ", " + limit;
+            }
             logger.debug(sql);
             List<T> data = (List < T >)queryRunner.query(sql, listHandler);
             return new PageDataResult<>(count, offset, data);
@@ -487,9 +497,10 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         try {
             String whereStatement = getWhereStatement(sql);
             ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-            sql = logicDeleted?"select count(*) as c from " + getTableName() + 
-                    " where " + (StringUtils.isBlank(whereStatement)?"":whereStatement + " ") + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'":
-                "select count(*) as c from " + getTableName() + (StringUtils.isBlank(whereStatement)?"":" where " + whereStatement);
+            //sql = logicDeleted?"select count(*) as c from " + getTableName() + 
+            //        " where " + (StringUtils.isBlank(whereStatement)?"":whereStatement + " ") + " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'":
+            //    "select count(*) as c from " + getTableName() + (StringUtils.isBlank(whereStatement)?"":" where " + whereStatement);
+            sql = "select count(*) as c from " + getTableName() + (StringUtils.isBlank(whereStatement)?"":" where " + whereStatement);
             logger.debug(sql);
             return queryRunner.query(sql, countHandler);
         } catch (JSQLParserException e) {
@@ -502,7 +513,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
         String sql = "select count(*) as c from " + JdbcDao.this.getTableName() + " where " + createConditionSegment(map);
         if (logicDeleted && !map.containsKey(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return queryRunner.query(sql, countHandler);
@@ -512,7 +523,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
         String sql = "select count(*) as c from " + JdbcDao.this.getTableName() + " where " + field + "=?";
         if (logicDeleted && !field.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return queryRunner.query(sql, countHandler, value);
@@ -522,7 +533,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
         String sql = "select count(*) as c from " + JdbcDao.this.getTableName() + " where " + field + "!=?";
         if (logicDeleted && !field.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return queryRunner.query(sql, countHandler, value);
@@ -532,7 +543,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
         String sql = "select count(*) as c from " + JdbcDao.this.getTableName() + " where " + field1 + "=? and " + field2 + "=?";
         if (logicDeleted && !field1.equals(getDelMarkFieldName()) && !field2.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "'" + getDelMarkFieldValue() + "'";
+            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return queryRunner.query(sql, countHandler, value1, value2);
@@ -632,8 +643,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return JdbcDaoConfig.getConfig().getFieldNameSplit() == JdbcDaoConfig.NAME_SPLIT_UNDERLINE;
     }
     private String amendFieldName(String name) {
+        if (columnToPropertyOverrides.containsKey(name)) {
+            return name;
+        }
+        name = PropertyToPropertyOverrides.get(name);
+        if (StringUtils.isNotBlank(name)) return name;
+        throw new RuntimeException("字段" + name + "不存在");
         //return isNnderlineFieldName()? CamelUnderLineUtils.camelToUnderline(name) : name;
-        return PropertyToPropertyOverrides.get(name);
     }
 
     public Boolean getLogicDeleted() {
