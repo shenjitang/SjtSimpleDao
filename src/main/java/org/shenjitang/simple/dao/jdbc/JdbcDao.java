@@ -12,6 +12,8 @@ import java.beans.PropertyDescriptor;
 import java.io.StringReader;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.math.BigInteger;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,6 +32,7 @@ import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.dbutils.BasicRowProcessor;
 import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
@@ -58,7 +61,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     protected String insertSql;
     protected String insertSqlNoId;
     protected BeanListHandler listHandler;
-    protected BeanHandler beanHandler;
+    protected BeanHandler<T> beanHandler;
     protected String delMarkFieldName;
     protected String delMarkFieldValue;
 
@@ -154,7 +157,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             }
             logger.debug(sql + " \n params: " + sb.toString());
             queryRunner.update(sql, values);
-        } else {
+        } else { //bean中的id是null
             int size = fieldNames.length;
             if (haveId) {
                 size = fieldNames.length - 1;
@@ -177,7 +180,19 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
                 sb.append(v).append(" ");
             }
             logger.debug(sql + " \n params: " + sb.toString());
-            queryRunner.update(sql, values);
+            //queryRunner.update(sql, values);
+            if (find == 1) { //表中有id字段
+                queryRunner.update(sql, values);
+                String sql2 = "select @@identity";
+                Object idd = queryRunner.query(sql2,new ScalarHandler(1)); //获得自增长id，类型是BigInteger
+                PropertyDescriptor pd = PropertyUtils.getPropertyDescriptor(bean, "id");
+                Class idType = pd.getPropertyType();
+                Object iddd = idType.getMethod("valueOf", String.class).invoke(null, idd.toString());//转换成Bean中id的类型
+                PropertyUtils.setProperty(bean, "id", iddd);
+                logger.debug("...");
+            } else {//表中没有id字段
+                queryRunner.update(sql, values);
+            }
         }
     } 
     
