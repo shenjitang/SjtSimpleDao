@@ -180,18 +180,15 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
                 sb.append(v).append(" ");
             }
             logger.debug(sql + " \n params: " + sb.toString());
-            //queryRunner.update(sql, values);
+            queryRunner.update(sql, values);
             if (find == 1) { //表中有id字段
-                queryRunner.update(sql, values);
                 String sql2 = "select @@identity";
                 Object idd = queryRunner.query(sql2,new ScalarHandler(1)); //获得自增长id，类型是BigInteger
                 PropertyDescriptor pd = PropertyUtils.getPropertyDescriptor(bean, "id");
                 Class idType = pd.getPropertyType();
                 Object iddd = idType.getMethod("valueOf", String.class).invoke(null, idd.toString());//转换成Bean中id的类型
                 PropertyUtils.setProperty(bean, "id", iddd);
-                logger.debug("...");
-            } else {//表中没有id字段
-                queryRunner.update(sql, values);
+                logger.debug("ID：" + PropertyUtils.getProperty(bean, "id"));
             }
         }
     } 
