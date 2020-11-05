@@ -91,7 +91,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     }
     
     @Override
-    public void remove(String key, String value) {
+    public void remove(String key, Object value) {
         Map map = new HashMap();
         map.put(key, value);
         remove(map);

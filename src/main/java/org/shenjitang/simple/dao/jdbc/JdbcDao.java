@@ -252,7 +252,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
     
     @Override
-    public void remove(String key, String value) throws SQLException {
+    public void remove(String key, Object value) throws SQLException {
         String sql = logicDeleted?
             "update `" + getTableName() + "` set `" + getDelMarkFieldName() + "`='" + getDelMarkFieldValue()  + 
                 "' where " + key + "=?":
