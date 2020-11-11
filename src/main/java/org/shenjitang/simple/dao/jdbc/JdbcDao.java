@@ -6,6 +6,7 @@
 
 package org.shenjitang.simple.dao.jdbc;
 
+import com.mongodb.annotations.Immutable;
 import org.shenjitang.simple.dao.BaseDao;
 import org.shenjitang.simple.dao.utils.CamelUnderLineUtils;
 import java.beans.PropertyDescriptor;
@@ -16,9 +17,12 @@ import java.math.BigInteger;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
@@ -37,6 +41,7 @@ import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.commons.lang.StringUtils;
+import org.shenjitang.common.properties.PropertiesUtils;
 import org.shenjitang.simple.dao.PageDataResult;
 import org.shenjitang.simple.dao.utils.NestedBeanProcessor;
 import org.slf4j.Logger;
@@ -57,6 +62,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     protected String[] columnNames;
     protected Map<String,String> columnToPropertyOverrides;
     protected Map<String,String> PropertyToPropertyOverrides;
+    protected Map<String,PropertyDescriptor> propertyDesriptorMap;
     protected NestedBeanProcessor processor;
     protected String insertSql;
     protected String insertSqlNoId;
@@ -64,10 +70,23 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     protected BeanHandler<T> beanHandler;
     protected String delMarkFieldName;
     protected String delMarkFieldValue;
-
+    private static Set<String> numberTypes;
+    static {
+        numberTypes = new HashSet();
+        numberTypes.add("int");
+        numberTypes.add("long");
+        numberTypes.add("flot");
+        numberTypes.add("double");
+        numberTypes.add("java.lang.Integer");
+        numberTypes.add("java.lang.Long");
+        numberTypes.add("java.lang.Float");
+        numberTypes.add("java.lang.Double");
+    }
+    
     public JdbcDao() {
         columnToPropertyOverrides = new HashMap();
         PropertyToPropertyOverrides = new HashMap();
+        propertyDesriptorMap = new HashMap();
         entityClass = getT();
         PropertyDescriptor[] pdArray = PropertyUtils.getPropertyDescriptors(entityClass);
         fieldNames = new String[pdArray.length - 1];
@@ -86,6 +105,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             //columnNames[i] = fieldNames[i];
             columnToPropertyOverrides.put(columnNames[i], fieldNames[i]);
             PropertyToPropertyOverrides.put(fieldNames[i], columnNames[i]);
+            propertyDesriptorMap.put(pd.getName(), pd);
             i++;
         }
         processor = new NestedBeanProcessor(columnToPropertyOverrides);
@@ -352,14 +372,15 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'"; 
+        //String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'"; 
+        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where " + whereInSql(fieldName, value); 
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
             sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
         }
         logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler);
     }
-
+    /*
     public T findOne(String fieldName1, Object value1, String fieldName2, Object value2) throws Exception {
         String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + 
                 amendFieldName(fieldName1) + "`=? and `" + amendFieldName(fieldName2) + "`=?"; 
@@ -368,6 +389,16 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         }
         logger.debug(sql);
         return (T)queryRunner.query(sql, beanHandler, value1, value2);
+    } */
+
+    public T findOne(String fieldName1, Object value1, String fieldName2, Object value2) throws Exception {
+        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where " + whereInSql(fieldName1, value1)
+            + " and " + whereInSql(fieldName2, value2); 
+        if (logicDeleted && !fieldName1.equals(getDelMarkFieldName()) && !fieldName2.equals(getDelMarkFieldName())) {
+            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+        }
+        logger.debug(sql);
+        return (T)queryRunner.query(sql, beanHandler);
     }
 
     @Override
@@ -392,7 +423,8 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
     
     public List<T> find(String fieldName, Object value) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'";
+        //String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'";
+        String sql = "select * from `" + this.getTableName() + "` where " + whereInSql(fieldName, value);
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
             sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
         }
@@ -401,7 +433,8 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
     
     public PageDataResult<T> find(int offset, int limit, String fieldName, Object value) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'";
+        //String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'";
+        String sql = "select * from `" + this.getTableName() + "` where " + whereInSql(fieldName, value);
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
             sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
         }
@@ -577,6 +610,43 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return (Class) params[0];  
     }
     
+    public final Class getFieldType(String fieldName) {
+        return propertyDesriptorMap.get(fieldName).getPropertyType();
+    }
+    
+    public String whereInSql(String fieldName, Object fieldValue) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("`").append(fieldName).append("`");
+        Class clazz = getFieldType(fieldName);
+        if (fieldValue instanceof Collection) {
+            sb.append(" in (");
+            for (Object v : (Collection) fieldValue) {
+                sb.append(whereValueInSql(clazz, v)).append(",");
+            }
+            sb.deleteCharAt(sb.length() - 1);
+            sb.append(")");
+        } else {
+            sb.append("=");
+            sb.append(whereValueInSql(clazz, fieldValue));
+        }
+        return sb.toString();
+    }
+
+    public String whereValueInSql(Class clazz, Object fieldValue) {
+        String type = clazz.getName();
+        if (numberTypes.contains(type)) {
+            return fieldValue.toString();
+        } else if ("boolean".equals(type) || "java.lang.Boolean".equals(type)) {
+            if (Boolean.valueOf(fieldValue.toString())) {
+                return "1";
+            } else {
+                return "0";
+            }
+        } else {
+            return "'" + fieldValue.toString() + "'";
+        }
+    } 
+    
     protected String getInsertSql() {
         if (insertSql == null) {
             StringBuilder sb = new StringBuilder();
@@ -646,10 +716,12 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             if (i++ > 0) {
                 sb.append(" and ");
             }
-            sb.append("`").append(key.toString()).append("`").append("='").append(map.get(key).toString()).append("'");
+            sb.append(whereInSql((String)key, map.get(key)));
+            //sb.append("`").append(key.toString()).append("`").append("='").append(map.get(key).toString()).append("'");
         }
         return sb.toString();
     }
+    
     
     private boolean isNnderlineFieldName() {
         return JdbcDaoConfig.getConfig().getFieldNameSplit() == JdbcDaoConfig.NAME_SPLIT_UNDERLINE;
@@ -720,11 +792,12 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         }
         return whereExpression.toString();
     }
-    
-    public static void main(String[] args) throws JSQLParserException {
+    /*
+    public static void main(String[] args) throws Exception {
         String sql = "select * from sss where a=3 and b!=5 and ccc=true order by dd limit 1, 10";
-        System.out.println(getWhereStatement(sql));
+        System.out.println(getWhereStatement(sql));        
     }
+*/
     
 
 }
