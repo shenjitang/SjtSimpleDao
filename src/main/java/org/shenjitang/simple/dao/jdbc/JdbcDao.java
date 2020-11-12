@@ -61,8 +61,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     protected String[] fieldNames;
     protected String[] columnNames;
     protected Map<String,String> columnToPropertyOverrides;
-    protected Map<String,String> PropertyToPropertyOverrides;
+    protected Map<String,String> PropertyToColumnOverrides;
     protected Map<String,PropertyDescriptor> propertyDesriptorMap;
+    protected Map<String,PropertyDescriptor> columnDesriptorMap;
     protected NestedBeanProcessor processor;
     protected String insertSql;
     protected String insertSqlNoId;
@@ -85,8 +86,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     public JdbcDao() {
         columnToPropertyOverrides = new HashMap();
-        PropertyToPropertyOverrides = new HashMap();
+        PropertyToColumnOverrides = new HashMap();
         propertyDesriptorMap = new HashMap();
+        columnDesriptorMap = new HashMap();
         entityClass = getT();
         PropertyDescriptor[] pdArray = PropertyUtils.getPropertyDescriptors(entityClass);
         fieldNames = new String[pdArray.length - 1];
@@ -104,8 +106,9 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             }
             //columnNames[i] = fieldNames[i];
             columnToPropertyOverrides.put(columnNames[i], fieldNames[i]);
-            PropertyToPropertyOverrides.put(fieldNames[i], columnNames[i]);
+            PropertyToColumnOverrides.put(fieldNames[i], columnNames[i]);
             propertyDesriptorMap.put(pd.getName(), pd);
+            columnDesriptorMap.put(columnNames[i], pd);
             i++;
         }
         processor = new NestedBeanProcessor(columnToPropertyOverrides);
@@ -611,12 +614,24 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
     
     public final Class getFieldType(String fieldName) {
-        return propertyDesriptorMap.get(fieldName).getPropertyType();
+        if (fieldName.contains("_")) {
+            fieldName = columnToPropertyOverrides.get(fieldName);
+        }
+        if (!PropertyToColumnOverrides.containsKey(fieldName)) {
+            throw new RuntimeException("no field find:" + fieldName);
+        }
+        if (propertyDesriptorMap.containsKey(fieldName)) {
+            return propertyDesriptorMap.get(fieldName).getPropertyType();
+        } else if (columnDesriptorMap.containsKey(fieldName)) {
+            return columnDesriptorMap.get(fieldName).getPropertyType();
+        } else {
+            throw new RuntimeException("fieldName not find:" + fieldName);
+        }
     }
     
     public String whereInSql(String fieldName, Object fieldValue) {
         StringBuilder sb = new StringBuilder();
-        sb.append("`").append(fieldName).append("`");
+        sb.append("`").append(amendFieldName(fieldName)).append("`");
         Class clazz = getFieldType(fieldName);
         if (fieldValue instanceof Collection) {
             sb.append(" in (");
@@ -726,11 +741,11 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     private boolean isNnderlineFieldName() {
         return JdbcDaoConfig.getConfig().getFieldNameSplit() == JdbcDaoConfig.NAME_SPLIT_UNDERLINE;
     }
-    private String amendFieldName(String name) {
+    String amendFieldName(String name) {
         if (columnToPropertyOverrides.containsKey(name)) {
             return name;
         }
-        name = PropertyToPropertyOverrides.get(name);
+        name = PropertyToColumnOverrides.get(name);
         if (StringUtils.isNotBlank(name)) return name;
         throw new RuntimeException("字段" + name + "不存在");
         //return isNnderlineFieldName()? CamelUnderLineUtils.camelToUnderline(name) : name;
