@@ -13,15 +13,13 @@ import java.util.List;
  */
 public class PageDataResult<T> {
     private Long amount;
-    private Integer startIndex;
     private List<T> data;
 
     public PageDataResult() {
     }
 
-    public PageDataResult(Long amount, Integer startIndex, List<T> data) {
+    public PageDataResult(Long amount, List<T> data) {
         this.amount = amount;
-        this.startIndex = startIndex;
         this.data = data;
     }
 
@@ -32,14 +30,6 @@ public class PageDataResult<T> {
 
     public void setAmount(Long amount) {
         this.amount = amount;
-    }
-
-    public Integer getStartIndex() {
-        return startIndex;
-    }
-
-    public void setStartIndex(Integer startIndex) {
-        this.startIndex = startIndex;
     }
 
     public List<T> getData() {

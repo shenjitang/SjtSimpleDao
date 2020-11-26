@@ -39,10 +39,13 @@ import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
+import org.apache.commons.dbutils.handlers.MapHandler;
+import org.apache.commons.dbutils.handlers.MapListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.commons.lang.StringUtils;
 import org.shenjitang.common.properties.PropertiesUtils;
 import org.shenjitang.simple.dao.PageDataResult;
+import static org.shenjitang.simple.dao.jdbc.JdbcDaoConfig.NAME_SPLIT_UNDERLINE;
 import org.shenjitang.simple.dao.utils.NestedBeanProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -319,13 +322,37 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return (List<T>) queryRunner.query(sql, listHandler);
     }
     
+    public <B> List<B> findBeanList(String sql, Class<B> clazz) throws SQLException {
+        BeanListHandler handler = new BeanListHandler(clazz);
+        logger.debug(sql);
+        return (List<B>) queryRunner.query(sql, handler);
+    }
+    
+    public List<Map<String, Object>> findMapList(String sql) throws SQLException {
+        MapListHandler handler = new MapListHandler();
+        logger.debug(sql);
+        return queryRunner.query(sql, handler);
+    }
+    
+    public <B> B findBean(String sql, Class<B> clazz) throws SQLException {
+        BeanHandler<B> handler = new BeanHandler(clazz);
+        logger.debug(sql);
+        return queryRunner.query(sql, handler);
+    }
+    
+    public Map<String, Object> findMap(String sql) throws SQLException {
+        MapHandler handler = new MapHandler();
+        logger.debug(sql);
+        return queryRunner.query(sql, handler);
+    }
+    
     public PageDataResult<T> find(int offset, int limit, String sql) throws SQLException {
         Long count = count(sql);
         if (offset >= 0) {
             sql += " limit " + offset + ", " + limit;
         }
         List<T> data = find(sql);
-        return new PageDataResult(count, offset, data);
+        return new PageDataResult(count, data);
     }
     
     @Override
@@ -341,7 +368,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         }
         logger.debug(sql);
         List<T> data = (List<T>)queryRunner.query(sql, listHandler, parameters);
-        return new PageDataResult(count, offset, data);
+        return new PageDataResult(count, data);
     }
 
     @Override
@@ -370,7 +397,12 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     @Override
     public T findOne(Object id) throws Exception {
-        return get(id);
+        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where id='" + id + "'";  
+        if (logicDeleted) {
+            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+        }
+        logger.debug(sql);
+        return (T)queryRunner.query(sql, beanHandler);
     }
     
     @Override
@@ -447,7 +479,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         }
         logger.debug(sql);
         List<T> data = (List < T >)queryRunner.query(sql, listHandler);
-        return new PageDataResult<T>(count, offset, data);
+        return new PageDataResult<T>(count, data);
     }
 
     public List<T> findNotEquals(String fieldName, Object value) throws Exception {
@@ -470,7 +502,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         }
         logger.debug(sql);
         List<T> data = (List < T >)queryRunner.query(sql, listHandler);
-        return new PageDataResult<T>(count, offset, data);
+        return new PageDataResult<T>(count, data);
     }
     
     @Override
@@ -492,7 +524,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         }
         logger.debug(sql);
         List<T> data = (List < T >)queryRunner.query(sql, listHandler);
-        return new PageDataResult<T>(count, offset, data);
+        return new PageDataResult<T>(count, data);
     }
 
     public List<T> findAll(Boolean includeDeleted) throws Exception {
@@ -514,7 +546,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             }
             logger.debug(sql);
             List<T> data = (List < T >)queryRunner.query(sql, listHandler);
-            return new PageDataResult<>(count, offset, data);
+            return new PageDataResult<>(count, data);
         } else {
             return findAll(offset, limit);
         }
@@ -614,19 +646,17 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     }
     
     public final Class getFieldType(String fieldName) {
-        if (fieldName.contains("_")) {
-            fieldName = columnToPropertyOverrides.get(fieldName);
-        }
-        if (!PropertyToColumnOverrides.containsKey(fieldName)) {
-            throw new RuntimeException("no field find:" + fieldName);
+        if (fieldName.contains(".")) {
+            fieldName = StringUtils.substringAfter(fieldName, ".");
         }
         if (propertyDesriptorMap.containsKey(fieldName)) {
             return propertyDesriptorMap.get(fieldName).getPropertyType();
         } else if (columnDesriptorMap.containsKey(fieldName)) {
             return columnDesriptorMap.get(fieldName).getPropertyType();
         } else {
-            throw new RuntimeException("fieldName not find:" + fieldName);
+            return String.class;
         }
+        
     }
     
     public String whereInSql(String fieldName, Object fieldValue) {
@@ -739,9 +769,12 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     
     private boolean isNnderlineFieldName() {
-        return JdbcDaoConfig.getConfig().getFieldNameSplit() == JdbcDaoConfig.NAME_SPLIT_UNDERLINE;
+        return JdbcDaoConfig.getConfig().getFieldNameSplit() == NAME_SPLIT_UNDERLINE;
     }
     String amendFieldName(String name) {
+        if (name.contains(".")) {
+            name = StringUtils.substringAfter(name, ".");
+        }
         if (columnToPropertyOverrides.containsKey(name)) {
             return name;
         }
@@ -749,6 +782,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         if (StringUtils.isNotBlank(name)) return name;
         throw new RuntimeException("字段" + name + "不存在");
         //return isNnderlineFieldName()? CamelUnderLineUtils.camelToUnderline(name) : name;
+    }
+    
+    String amendTableName(String name) {
+        if (JdbcDaoConfig.getConfig().getTableNameSplit() == NAME_SPLIT_UNDERLINE)
+            return CamelUnderLineUtils.camelToUnderline(name);
+        else 
+            return name;
     }
 
     public Boolean getLogicDeleted() {
@@ -786,6 +826,31 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return map;
     }
 
+    private static SqlStruct parseSql(String sql) throws JSQLParserException {
+        SqlStruct sqlStruct = new SqlStruct();
+        CCJSqlParserManager parserManager = new CCJSqlParserManager();
+        Statement statement = parserManager.parse(new StringReader(sql));
+        if (statement instanceof Select) {
+            Select select = (Select) statement;
+            PlainSelect selectBody = (PlainSelect) select.getSelectBody();
+            sqlStruct.setCommand("select");
+            sqlStruct.setWhereStatement(selectBody.getWhere().toString());
+        } else if (statement instanceof Delete) {
+            Delete delete = (Delete) statement;
+            sqlStruct.setCommand("delete");
+            sqlStruct.setWhereStatement(delete.getWhere().toString());
+        } else if (statement instanceof Update) {
+            Update update = (Update) statement;
+            sqlStruct.setCommand("update");
+            sqlStruct.setWhereStatement(update.getWhere().toString());
+        } else if (statement instanceof Insert) {
+            sqlStruct.setCommand("insert");
+        } else {
+            throw new JSQLParserException("不支持的sql语句:" + sql);
+        }
+        return sqlStruct;
+    }
+    
     private static String getWhereStatement(String sql) throws JSQLParserException {
         CCJSqlParserManager parserManager = new CCJSqlParserManager();
         Statement statement = parserManager.parse(new StringReader(sql));

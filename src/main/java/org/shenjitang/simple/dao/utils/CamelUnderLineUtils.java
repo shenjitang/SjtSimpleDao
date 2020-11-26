@@ -25,7 +25,7 @@ public class CamelUnderLineUtils {
            char c=param.charAt(i);  
            if (Character.isUpperCase(c)){
                if (i > 0) {
-                sb.append(UNDERLINE);
+                   sb.append(UNDERLINE);
                }
                sb.append(Character.toLowerCase(c));  
            }else{  
