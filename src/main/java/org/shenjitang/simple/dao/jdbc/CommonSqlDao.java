@@ -82,7 +82,7 @@ public class CommonSqlDao <T> {
         numberTypes.add("java.lang.Float");
         numberTypes.add("java.lang.Double");
     }
-
+    
     private CommonSqlDao(Class<T> clazz, QueryRunner queryRunner) throws Exception {
         this.queryRunner = queryRunner;
         this.clazz = clazz;
@@ -92,18 +92,18 @@ public class CommonSqlDao <T> {
             DbTables tablesAnno = clazz.getAnnotation(DbTables.class);
             DbTable[] tableAnnos = tablesAnno.value();
             tableName = tableAnnos[0].value();
-            fromStr.append(" from ").append(tableName);
+            fromStr.append(" from ").append(wrapField(tableName));
             if (StringUtils.isNotBlank(tableAnnos[0].alias())) {
                 tableName = tableAnnos[0].alias();
-                fromStr.append(" ").append(tableName);
+                fromStr.append(" ").append(wrapField(tableName));
             }
             //tableAlias.add(tableName);
             for (int i = 1; i < tableAnnos.length; i++) {
-                fromStr.append(" ,").append(tableAnnos[i].value());
+                fromStr.append(" ,").append(wrapField(tableAnnos[i].value()));
                 String tName = tableAnnos[i].value();
                 if (StringUtils.isNotBlank(tableAnnos[i].alias())) {
                     tName = tableAnnos[i].alias();
-                    fromStr.append(" ").append(tName);
+                    fromStr.append(" ").append(wrapField(tName));
                 }
                 //tableAlias.add(tName);
             }
@@ -111,10 +111,10 @@ public class CommonSqlDao <T> {
             //获取该对象上Info类型的注解
             DbTable tableAnno = clazz.getAnnotation(DbTable.class);
             tableName = tableAnno.value();
-            fromStr.append(" from ").append(tableName);
+            fromStr.append(" from ").append(wrapField(tableName));
             if (StringUtils.isNotBlank(tableAnno.alias())) {
                 tableName = tableAnno.alias();
-                fromStr.append(" ").append(tableName);
+                fromStr.append(" ").append(wrapField(tableName));
             }
             //tableAlias.add(tableName);
         } else {
@@ -123,12 +123,12 @@ public class CommonSqlDao <T> {
             } else {
                 tableName = clazz.getSimpleName();
             }
-            fromStr.append(" from ").append(tableName);
+            fromStr.append(" from ").append(wrapField(tableName));
         }
         BeanInfo beanInfo = Introspector.getBeanInfo(clazz);
         PropertyDescriptor[] pda = beanInfo.getPropertyDescriptors();
         for (PropertyDescriptor pd : pda) {
-            logger.debug("property getDisplayName:" + pd.getDisplayName() + " getName:" + pd.getName() + " getShortDescription:" + pd.getShortDescription());
+            //logger.debug("property getDisplayName:" + pd.getDisplayName() + " getName:" + pd.getName() + " getShortDescription:" + pd.getShortDescription());
             if (!pd.getName().equalsIgnoreCase("class")) {
                 pds.add(pd);
             }
@@ -168,6 +168,9 @@ public class CommonSqlDao <T> {
                 info.setPropDesc(pd);
                 info.setLinkFieldName(linkAnno.value());
                 info.setTablePkFieldName(linkAnno.thisField());
+                if (StringUtils.isNotBlank(linkAnno.bridge())) {
+                    info.setBridge(linkAnno.bridge());
+                }
                 ParameterizedType type = (ParameterizedType) field.getGenericType();
                 Type ctype = type.getActualTypeArguments()[0];
                 info.setType(ctype);
@@ -192,8 +195,16 @@ public class CommonSqlDao <T> {
             }
             selectStr.append(fieldInfo.name());
         }
-        selectStr.append(fromStr).append(" ").append(joinStr);
+        //selectStr.append(fromStr).append(" ").append(joinStr);
         
+    }
+    
+    public CommonSqlDao addTable(String aTable, String alias) {
+        fromStr.append(" ,").append(wrapField(aTable));
+        if (StringUtils.isNotBlank(alias)) {
+            fromStr.append(" ").append(wrapField(alias));
+        }
+        return this;
     }
     
     public static <B> CommonSqlDao create(Class<B> clazz, QueryRunner queryRunner) throws Exception {
@@ -217,6 +228,11 @@ public class CommonSqlDao <T> {
 
     public CommonSqlDao eq(String fieldName, Object value) {
         return express("=", fieldName, value);
+    }
+    public CommonSqlDao link(String fieldName, String fieldName2) {
+        DbFieldInfo info = getFieldInfo(fieldName, fieldName2.getClass());
+        whereStr.append(wrapField(info.getColumnNameInSql())).append("=").append(wrapField(fieldName2));
+        return this;
     }
     
     public CommonSqlDao ne(String fieldName, Object value) {
@@ -292,7 +308,15 @@ public class CommonSqlDao <T> {
                 Object v = BeanUtils.getProperty(bean, linkInfo.getTablePkFieldName());
                 Class claz = Class.forName(linkInfo.getType().getTypeName());
                 CommonSqlDao dao = CommonSqlDao.create(claz, queryRunner);
-                List list = dao.where().eq(linkInfo.getLinkFieldName(), v).find();
+                List list = null;
+                if (linkInfo.isBridge()) {
+                    String bridge = linkInfo.getBridgeTable();
+                    list = dao.addTable(bridge, null).where()
+                        .link(bridge + "." + linkInfo.getBridgeRight(), dao.tableName + "." + linkInfo.getLinkFieldName()).
+                        and().eq(bridge + "." + linkInfo.getBridgeLeft(), v).find();
+                } else {
+                    list = dao.where().eq(linkInfo.getLinkFieldName(), v).find();
+                }
                 Method write = linkInfo.getPropDesc().getWriteMethod();
                 write.invoke(bean, list);
                 //linkInfo.getField().set(bean, list); 
@@ -307,7 +331,7 @@ public class CommonSqlDao <T> {
                 */
             }
         } catch (Exception e) {
-            throw new SQLException("sql语句生成时的反射错误。", e);
+            throw new SQLException("", e);
         }
     }
     
@@ -315,7 +339,7 @@ public class CommonSqlDao <T> {
         //BeanProcessor processor = new SimpleBeanProcessor();
         //BeanListHandler<T> listHandler = new BeanListHandler<>(clazz, new BasicRowProcessor(processor));
         BeanListHandler<T> listHandler = new BeanListHandler<>(clazz);
-        String sql = selectStr.toString() + whereStr.toString();
+        String sql = selectStr.toString() + fromStr + " " + joinStr + whereStr.toString();
         logger.debug(sql);
         List<T> list = queryRunner.query(sql, listHandler);
         if (linkList.size() > 0) {
@@ -330,7 +354,7 @@ public class CommonSqlDao <T> {
         //BeanProcessor processor = new SimpleBeanProcessor();
         //BeanHandler<T> beanHandler = new BeanHandler<>(clazz, new BasicRowProcessor(processor));
         BeanHandler<T> beanHandler = new BeanHandler<>(clazz);
-        String sql = selectStr.toString() + whereStr.toString();
+        String sql = selectStr.toString() + fromStr + " " + joinStr + whereStr.toString();
         logger.debug(sql);
         T bean = queryRunner.query(sql, beanHandler);
         findLinkedList(bean);
@@ -338,7 +362,7 @@ public class CommonSqlDao <T> {
     }
     
     public PageDataResult<T> findAndCount() throws SQLException {
-        String sql = selectStr.toString() + whereStr.toString();
+        String sql = selectStr.toString() + fromStr + " " + joinStr + whereStr.toString();
         String countSql = "select count(*) as c from " + StringUtils.substringAfter(sql, " from ");
         ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
         Long count = queryRunner.query(countSql, countHandler);
@@ -533,7 +557,7 @@ public class CommonSqlDao <T> {
 
     public DbFieldInfo getFieldInfo(String name, Class valueClass) {
         for (DbFieldInfo field : fieldList) {
-            if (field.getFieldName().equals(name)) {
+            if (field.getFieldName().equals(name) || field.getColumnName().equals(name) || field.getColumnNameInSql().equals(name)) {
                 return field;
             }
         }

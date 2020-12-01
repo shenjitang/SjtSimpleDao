@@ -51,7 +51,7 @@ public class DbFieldInfo {
     }
     
     public String name() {
-        return tableName + "." + columnName + " as " + fieldName;
+        return "`" + tableName + "`.`" + columnName + "` as `" + fieldName + "`";
     }
 
     public String getColumnName() {

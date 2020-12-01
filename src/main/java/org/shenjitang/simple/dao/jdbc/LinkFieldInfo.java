@@ -8,6 +8,7 @@ package org.shenjitang.simple.dao.jdbc;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Type;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  *
@@ -19,6 +20,10 @@ public class LinkFieldInfo {
     private PropertyDescriptor propDesc;
     private String linkFieldName; //本表的外健字段
     private String tablePkFieldName; //连接表的主键字段
+    private String bridge; //中间表连接。
+    private String bridgeTable;
+    private String bridgeLeft;
+    private String bridgeRight;
 
     public LinkFieldInfo() {
     }
@@ -64,5 +69,32 @@ public class LinkFieldInfo {
         this.propDesc = propDesc;
     }
 
+    public String getBridge() {
+        return bridge;
+    }
+
+    public void setBridge(String bridge) {
+        this.bridge = bridge;
+        String[] a = bridge.split(":");
+        bridgeLeft = a[0];
+        bridgeTable = a[1];
+        bridgeRight = a[2];
+    }
+
+    public String getBridgeTable() {
+        return bridgeTable;
+    }
+
+    public String getBridgeLeft() {
+        return bridgeLeft;
+    }
+
+    public String getBridgeRight() {
+        return bridgeRight;
+    }
+    
+    public boolean isBridge() {
+        return StringUtils.isNoneBlank(bridge);
+    }
 
 }

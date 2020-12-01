@@ -19,4 +19,5 @@ import java.lang.annotation.Target;
 public @interface DbLink {
     String value();
     String thisField();
+    String bridge() default "";
 }
