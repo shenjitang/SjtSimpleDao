@@ -58,65 +58,31 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     private static final Logger logger = LoggerFactory.getLogger(JdbcDao.class);
     protected Boolean logicDeleted = Boolean.FALSE;
     protected QueryRunner  queryRunner;
+    private SqlBeanParser<T> sqlBeanParser;
+    private JdbcDaoConfig config;
     protected String dbName;
-    protected String tableName;
+    //protected String tableName;
     protected Class<T> entityClass;
-    protected String[] fieldNames;
-    protected String[] columnNames;
-    protected Map<String,String> columnToPropertyOverrides;
-    protected Map<String,String> PropertyToColumnOverrides;
-    protected Map<String,PropertyDescriptor> propertyDesriptorMap;
-    protected Map<String,PropertyDescriptor> columnDesriptorMap;
-    protected NestedBeanProcessor processor;
+    //protected String[] fieldNames;
+    //protected String[] columnNames;
+    //protected Map<String,String> columnToPropertyOverrides;
+    //protected Map<String,String> PropertyToColumnOverrides;
+    //protected Map<String,PropertyDescriptor> propertyDesriptorMap;
+    //protected Map<String,PropertyDescriptor> columnDesriptorMap;
+    //protected NestedBeanProcessor processor;
     protected String insertSql;
     protected String insertSqlNoId;
     protected BeanListHandler listHandler;
     protected BeanHandler<T> beanHandler;
     protected String delMarkFieldName;
     protected String delMarkFieldValue;
-    private static Set<String> numberTypes;
-    static {
-        numberTypes = new HashSet();
-        numberTypes.add("int");
-        numberTypes.add("long");
-        numberTypes.add("flot");
-        numberTypes.add("double");
-        numberTypes.add("java.lang.Integer");
-        numberTypes.add("java.lang.Long");
-        numberTypes.add("java.lang.Float");
-        numberTypes.add("java.lang.Double");
-    }
     
-    public JdbcDao() {
-        columnToPropertyOverrides = new HashMap();
-        PropertyToColumnOverrides = new HashMap();
-        propertyDesriptorMap = new HashMap();
-        columnDesriptorMap = new HashMap();
+    public JdbcDao() throws Exception {
         entityClass = getT();
-        PropertyDescriptor[] pdArray = PropertyUtils.getPropertyDescriptors(entityClass);
-        fieldNames = new String[pdArray.length - 1];
-        columnNames = new String[pdArray.length - 1];
-        int i = 0;
-        for (PropertyDescriptor pd : pdArray) {
-            if ("class".equalsIgnoreCase(pd.getName())) {
-                continue;
-            }
-            fieldNames[i] = pd.getName();
-            if (isNnderlineFieldName()) {
-                columnNames[i] =  CamelUnderLineUtils.camelToUnderline(fieldNames[i]);
-            } else {
-                columnNames[i] = fieldNames[i];
-            }
-            //columnNames[i] = fieldNames[i];
-            columnToPropertyOverrides.put(columnNames[i], fieldNames[i]);
-            PropertyToColumnOverrides.put(fieldNames[i], columnNames[i]);
-            propertyDesriptorMap.put(pd.getName(), pd);
-            columnDesriptorMap.put(columnNames[i], pd);
-            i++;
-        }
-        processor = new NestedBeanProcessor(columnToPropertyOverrides);
-        listHandler = new BeanListHandler<>(entityClass, new BasicRowProcessor(processor));
-        beanHandler = new BeanHandler<>(entityClass, new BasicRowProcessor(processor));
+        this.sqlBeanParser = new SqlBeanParser(entityClass);
+        config = JdbcDaoConfig.getConfig();
+        listHandler = new BeanListHandler<>(entityClass);
+        beanHandler = new BeanHandler<>(entityClass);
     }
 
     public QueryRunner getQueryRunner() {
@@ -137,138 +103,28 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         this.dbName = dbName;
     }
 
-    public String getTableName() {
-        if (StringUtils.isBlank(tableName)) {
-            tableName = CamelUnderLineUtils.camelToUnderline(getT().getSimpleName());
-        }
-        return tableName;
-    }
-    
-    protected String getTableName(T bean) {
-        if (StringUtils.isBlank(tableName)) {
-            return CamelUnderLineUtils.camelToUnderline(bean.getClass().getSimpleName());
-        } else {
-            return tableName;
-        }
-        
-    }
-
-    public void setTableName(String tableName) {
-        this.tableName = tableName;
-    }
-    
     @Override
     public void insert(T bean) throws Exception {
-        Object id = null;
-        boolean haveId = true;
-        try {
-            id = PropertyUtils.getProperty(bean, "id");
-        } catch (Exception e) {
-            logger.info("bean 没有id属性");
-            //logger.warn("bean 没有id属性", e);
-            haveId = false;
-        }
-        if (id != null) {
-            Object[] values = new Object[fieldNames.length];
-            for (int i = 0; i < fieldNames.length; i++) {
-                values[i] = PropertyUtils.getProperty(bean, fieldNames[i]);
-                if (values[i] instanceof List) {
-                    values[i] = processor.getXstream().toXML(values[i]);
-                }
-            }
-            String sql = getInsertSql();
-            StringBuilder sb = new StringBuilder();
-            for (Object v : values) {
-                sb.append(v).append(" ");
-            }
-            logger.debug(sql + " \n params: " + sb.toString());
-            queryRunner.update(sql, values);
-        } else { //bean中的id是null
-            int size = fieldNames.length;
-            if (haveId) {
-                size = fieldNames.length - 1;
-            }
-            Object[] values = new Object[size];
-            int find = 0;
-            for (int i = 0; i < fieldNames.length; i++) {
-                if (!"id".equalsIgnoreCase(fieldNames[i])) {
-                    values[i-find] = PropertyUtils.getProperty(bean, fieldNames[i]);
-                    if (values[i-find] instanceof List) {
-                        values[i-find] = processor.getXstream().toXML(values[i]);
-                    }
-                } else {
-                    find = 1;
-                }
-            }
-            String sql = getInsertSqlNoId();
-            StringBuilder sb = new StringBuilder();
-            for (Object v : values) {
-                sb.append(v).append(" ");
-            }
-            logger.debug(sql + " \n params: " + sb.toString());
-            queryRunner.update(sql, values);
-            if (find == 1) { //表中有id字段
-                String sql2 = "select @@identity";
-                Object idd = queryRunner.query(sql2,new ScalarHandler(1)); //获得自增长id，类型是BigInteger
-                PropertyDescriptor pd = PropertyUtils.getPropertyDescriptor(bean, "id");
-                Class idType = pd.getPropertyType();
-                Object iddd = idType.getMethod("valueOf", String.class).invoke(null, idd.toString());//转换成Bean中id的类型
-                PropertyUtils.setProperty(bean, "id", iddd);
-                logger.debug("ID：" + PropertyUtils.getProperty(bean, "id"));
-            }
-        }
+        CommonSqlDao.create(entityClass, queryRunner).insert(bean);
     } 
     
     @Override
     public void update(T bean) throws Exception {
-        Object id = PropertyUtils.getProperty(bean, "id");
-        update(bean, "id", id);
+        CommonSqlDao.create(entityClass, queryRunner).update(bean);
     }
     
     @Override
     public void update(Map map, String findField, Object findValue) throws Exception {
-        List fields = new ArrayList();
-        List values = new ArrayList();
-        for (int i = 0; i < fieldNames.length; i++) {
-            if (map.containsKey(fieldNames[i])) {
-                fields.add(columnNames[i]);
-                values.add(map.get(fieldNames[i]));
-            }
-        }
-        String sql = getUpdateSql(findField, fields);
-        logger.debug(sql);
-        values.add(findValue);
-        queryRunner.update(sql, values.toArray());
+        CommonSqlDao.create(entityClass, queryRunner).where().eq(findField, findValue).update(map);
     }
     
     @Override
     public void update(T bean, String findFiled, Object value) throws Exception {
-        Object[] values = new Object[fieldNames.length + 1];
-        for (int i = 0; i < fieldNames.length; i++) {
-            values[i] = PropertyUtils.getProperty(bean, fieldNames[i]);
-            if (values[i] instanceof List) {
-                values[i] = processor.getXstream().toXML(values[i]);
-            }
-        }
-        values[fieldNames.length] = value;
-        String sql = getUpdateSql(findFiled);
-        logger.debug(sql);
-        queryRunner.update(sql, values);
+        CommonSqlDao.create(entityClass, queryRunner).where().eq(findFiled, value).update(bean);
     }
 
     public void update(T bean, String findFiled, Object value, String findFiled2, Object value2) throws Exception {
-        Object[] values = new Object[fieldNames.length + 2];
-        for (int i = 0; i < fieldNames.length; i++) {
-            values[i] = PropertyUtils.getProperty(bean, fieldNames[i]);
-            if (values[i] instanceof List) {
-                values[i] = processor.getXstream().toXML(values[i]);
-            }
-        }
-        values[fieldNames.length] = value;
-        values[fieldNames.length + 1] = value2;
-        String sql = getUpdateSql(findFiled,findFiled2);
-        logger.debug(sql);
-        queryRunner.update(sql, values);
+        CommonSqlDao.create(entityClass, queryRunner).where().eq(findFiled, value).and().eq(findFiled2, value2).update(bean);
     }
        
     @Override
@@ -279,40 +135,41 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     
     @Override
     public void remove(String key, Object value) throws SQLException {
-        String sql = logicDeleted?
-            "update `" + getTableName() + "` set `" + getDelMarkFieldName() + "`='" + getDelMarkFieldValue()  + 
-                "' where " + key + "=?":
-            "delete from `" + JdbcDao.this.getTableName() + "` where `" + key + "`=?";
-        logger.debug(sql);
-        queryRunner.update(sql, value);
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().eq(key, value);
+        if (logicDeleted) {
+            dao.update(getDelMarkFieldName(), getDelMarkFieldValue());
+        } else {
+            dao.delete();
+        }
     }
     
     @Override
     public void remove(Object id) throws SQLException {
-        String sql = logicDeleted?
-            "update `" + getTableName() + "` set `" + getDelMarkFieldName() + "`='" + getDelMarkFieldValue()  + 
-                "' where id=?":
-            "delete from `" + JdbcDao.this.getTableName() + "` where id=?";
-        logger.debug(sql);
-        queryRunner.update(sql, id);
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().eq("id", id);
+        if (logicDeleted) {
+            dao.update(getDelMarkFieldName(), getDelMarkFieldValue());
+        } else {
+            dao.delete();
+        }
     }
     
     public void remove(Map map) throws SQLException {
-        String sql = logicDeleted?
-            "update `" + getTableName() + "` set `" + getDelMarkFieldName() + "`='" + getDelMarkFieldValue() + 
-                " where " + createConditionSegment(map):
-            "delete from `" + JdbcDao.this.getTableName() + "` where " + createConditionSegment(map);
-        logger.debug(sql);
-        queryRunner.update(sql);
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().and(map);
+        if (logicDeleted) {
+            dao.update(getDelMarkFieldName(), getDelMarkFieldValue());
+        } else {
+            dao.delete();
+        }
     }
 
     @Override
     public void removeAll() throws SQLException {
-        String sql = logicDeleted?
-            "update `" + getTableName() + "` set `" + getDelMarkFieldName() + "`='" + getDelMarkFieldValue():
-            "delete from `" + JdbcDao.this.getTableName() + "`";
-        logger.debug(sql);
-        queryRunner.update(sql);
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner);
+        if (logicDeleted) {
+            dao.update(getDelMarkFieldName(), getDelMarkFieldValue());
+        } else {
+            dao.delete();
+        }
     }
 
     
@@ -373,76 +230,60 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
 
     @Override
     public List<T> find(Map map) throws SQLException {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where " + createConditionSegment(map);
-        if (logicDeleted && !map.containsKey(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().and(map);
+        if (logicDeleted) {
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        return find(sql);
+        return dao.find();
     }
     
     public PageDataResult<T> find(int offset, int limit, Map map) throws SQLException {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where " + createConditionSegment(map);
-        if (logicDeleted && !map.containsKey(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().and(map);
+        if (logicDeleted) {
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        return find(offset, limit, sql);
+        return dao.limit(offset, limit).findAndCount();
     }
 
     @Override 
     public T get(Object id) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where id='" + id + "'"; 
-        logger.debug(sql);
-        return (T)queryRunner.query(sql, beanHandler);
+        return (T)CommonSqlDao.create(entityClass, queryRunner).where().eq("id", id).findOne();
     }
     
     @Override
     public T findOne(Object id) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where id='" + id + "'";  
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().eq("id", id);
         if (logicDeleted) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+            dao.and(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        logger.debug(sql);
-        return (T)queryRunner.query(sql, beanHandler);
+        return dao.findOne();
     }
     
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
-        //String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'"; 
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where " + whereInSql(fieldName, value); 
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().eq(fieldName, value);
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        logger.debug(sql);
-        return (T)queryRunner.query(sql, beanHandler);
+        return dao.findOne();
     }
-    /*
-    public T findOne(String fieldName1, Object value1, String fieldName2, Object value2) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + 
-                amendFieldName(fieldName1) + "`=? and `" + amendFieldName(fieldName2) + "`=?"; 
-        if (logicDeleted && !fieldName1.equals(getDelMarkFieldName()) && !fieldName2.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
-        }
-        logger.debug(sql);
-        return (T)queryRunner.query(sql, beanHandler, value1, value2);
-    } */
 
     public T findOne(String fieldName1, Object value1, String fieldName2, Object value2) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where " + whereInSql(fieldName1, value1)
-            + " and " + whereInSql(fieldName2, value2); 
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().eq(fieldName1, value1).and()
+            .eq(fieldName2, value2);
         if (logicDeleted && !fieldName1.equals(getDelMarkFieldName()) && !fieldName2.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        logger.debug(sql);
-        return (T)queryRunner.query(sql, beanHandler);
+        return dao.findOne();
     }
 
     @Override
     public T findOne(Map map) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where " + createConditionSegment(map);
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().and(map);
         if (logicDeleted && !map.containsKey(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }        
-        return findOne(sql);
+        return dao.findOne();
     }
     
     @Override
@@ -451,184 +292,106 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         if (sql.toLowerCase().startsWith("select ")) {
             return (T)queryRunner.query(sql, beanHandler);
         } else {
-            String rsql = "select * from `" + JdbcDao.this.getTableName() + "` where id='" + sql + "'"; 
+            String rsql = "select * from `" + sqlBeanParser.getTableName() + "` where id='" + sql + "'"; 
             logger.debug(rsql);
             return (T)queryRunner.query(rsql, beanHandler);
         }     
     }
     
     public List<T> find(String fieldName, Object value) throws Exception {
-        //String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'";
-        String sql = "select * from `" + this.getTableName() + "` where " + whereInSql(fieldName, value);
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().eq(fieldName, value);
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        logger.debug(sql);
-        return (List<T>) queryRunner.query(sql, listHandler);
+        return dao.find();
     }
     
     public PageDataResult<T> find(int offset, int limit, String fieldName, Object value) throws Exception {
-        //String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`='" + value + "'";
-        String sql = "select * from `" + this.getTableName() + "` where " + whereInSql(fieldName, value);
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().eq(fieldName, value);
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        Long count = count(sql);
-        if (offset >= 0) {
-            sql += " limit " + offset + ", " + limit;
-        }
-        logger.debug(sql);
-        List<T> data = (List < T >)queryRunner.query(sql, listHandler);
-        return new PageDataResult<T>(count, data);
+        return dao.limit(offset, limit).findAndCount();
     }
 
     public List<T> findNotEquals(String fieldName, Object value) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`!='" + value + "'";
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().ne(fieldName, value);
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'";
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        logger.debug(sql);
-        return (List<T>) queryRunner.query(sql, listHandler);
+        return dao.find();
     }
 
     public PageDataResult<T> findNotEquals(int offset, int limit, String fieldName, Object value) throws Exception {
-        String sql = "select * from `" + JdbcDao.this.getTableName() + "` where `" + amendFieldName(fieldName) + "`!='" + value + "'";
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().ne(fieldName, value);
         if (logicDeleted && !fieldName.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
+            dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        Long count = count(sql);
-        if (offset >= 0) {
-            sql += " limit " + offset + ", " + limit;
-        }
-        logger.debug(sql);
-        List<T> data = (List < T >)queryRunner.query(sql, listHandler);
-        return new PageDataResult<T>(count, data);
+        return dao.limit(offset, limit).findAndCount();
     }
     
     @Override
     public List<T> findAll() throws Exception {
-        String sql = logicDeleted?"select * from `" + JdbcDao.this.getTableName() + 
-                "` where " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'":
-            "select * from `" + JdbcDao.this.getTableName() + "`";
-        logger.debug(sql);
-        return (List<T>) queryRunner.query(sql, listHandler);
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner);
+        if (logicDeleted) {
+            dao.where().ne(getDelMarkFieldName(), getDelMarkFieldValue());
+        }
+        return dao.find();
     }
     
     public PageDataResult<T> findAll(int offset, int limit) throws Exception {
-        String sql = logicDeleted?"select * from `" + JdbcDao.this.getTableName() + 
-                "` where `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'":
-            "select * from `" + JdbcDao.this.getTableName() + "`";
-        Long count = count(sql);
-        if (offset >= 0) {
-            sql += " limit " + offset + ", " + limit;
+        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner);
+        if (logicDeleted) {
+            dao.where().ne(getDelMarkFieldName(), getDelMarkFieldValue());
         }
-        logger.debug(sql);
-        List<T> data = (List < T >)queryRunner.query(sql, listHandler);
-        return new PageDataResult<T>(count, data);
+        return dao.limit(offset, limit).findAndCount();
     }
 
     public List<T> findAll(Boolean includeDeleted) throws Exception {
-        if (includeDeleted) {
-            String sql = "select * from `" + JdbcDao.this.getTableName() + "`";
-            logger.debug(sql);
-            return (List<T>) queryRunner.query(sql, listHandler);
-        } else {
-            return findAll();
-        }
+        return includeDeleted?CommonSqlDao.create(entityClass, queryRunner).find():findAll();
     }
 
     public PageDataResult<T> findAll(int offset, int limit, Boolean includeDeleted) throws Exception {
-        if (includeDeleted) {
-            String sql = "select * from `" + JdbcDao.this.getTableName() + "`";
-            Long count = count(sql);
-            if (offset >= 0) {
-                sql += " limit " + offset + ", " + limit;
-            }
-            logger.debug(sql);
-            List<T> data = (List < T >)queryRunner.query(sql, listHandler);
-            return new PageDataResult<>(count, data);
-        } else {
-            return findAll(offset, limit);
-        }
+        return includeDeleted?
+            CommonSqlDao.create(entityClass, queryRunner).limit(offset, limit).findAndCount()
+            : findAll(offset, limit);
     }
     
     @Override
     public Long count() throws SQLException{
-        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        String sql = logicDeleted?"select count(*) as c from `" + getTableName() + 
-                "` where `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'":
-            "select count(*) as c from `" + getTableName() + "`";
-        logger.debug(sql);
-        return queryRunner.query(sql, countHandler);
+        return CommonSqlDao.create(entityClass, queryRunner).where().ne(getDelMarkFieldName(), getDelMarkFieldValue()).count();
     }
     
     public Long count(Boolean includeDeleted) throws Exception {
-        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        if (includeDeleted) {
-            String sql = "select count(*) as c from `" + getTableName() + "`";
-            logger.debug(sql);
-            return queryRunner.query(sql, countHandler);
-        } else {
-            return count();
-        }
+        return includeDeleted?CommonSqlDao.create(entityClass, queryRunner).count():count();
     }
     
-    protected Long count(String sql) throws SQLException {
-        try {
-            String whereStatement = getWhereStatement(sql);
-            ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-            //sql = logicDeleted?"select count(*) as c from " + getTableName() + 
-            //        " where " + (StringUtils.isBlank(whereStatement)?"":whereStatement + " ") + " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'":
-            //    "select count(*) as c from " + getTableName() + (StringUtils.isBlank(whereStatement)?"":" where " + whereStatement);
-            sql = "select count(*) as c from `" + getTableName() + "`" + (StringUtils.isBlank(whereStatement)?"":" where " + whereStatement);
-            logger.debug(sql);
-            return queryRunner.query(sql, countHandler);
-        } catch (JSQLParserException e) {
-            throw new SQLException("parse sql err:" + sql, e);
-        }
-    }
-
     @Override
     public Long count(Map map) throws SQLException{
-        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        String sql = "select count(*) as c from `" + JdbcDao.this.getTableName() + "` where " + createConditionSegment(map);
-        if (logicDeleted && !map.containsKey(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
-        }
-        logger.debug(sql);
-        return queryRunner.query(sql, countHandler);
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().and(map);
+        return logicDeleted?dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue()).count():dao.count();
     }
     
     public Long count(String field, Object value) throws SQLException {
-        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        String sql = "select count(*) as c from `" + JdbcDao.this.getTableName() + "` where `" + field + "`=?";
-        if (logicDeleted && !field.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
-        }
-        logger.debug(sql);
-        return queryRunner.query(sql, countHandler, value);
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().eq(field, value);
+        return logicDeleted?dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue()).count():dao.count();
     }
 
     public Long countNotEquals(String field, Object value) throws SQLException {
-        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        String sql = "select count(*) as c from `" + JdbcDao.this.getTableName() + "` where `" + field + "`!=?";
-        if (logicDeleted && !field.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
-        }
-        logger.debug(sql);
-        return queryRunner.query(sql, countHandler, value);
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().ne(field, value);
+        return logicDeleted?dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue()).count():dao.count();
     }
 
     public Long count(String field1, Object value1, String field2, Object value2) throws SQLException {
-        ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
-        String sql = "select count(*) as c from `" + JdbcDao.this.getTableName() + "` where `" + field1 + "`=? and `" + field2 + "`=?";
-        if (logicDeleted && !field1.equals(getDelMarkFieldName()) && !field2.equals(getDelMarkFieldName())) {
-            sql += " and `" + getDelMarkFieldName() + "`!='" + getDelMarkFieldValue() + "'";
-        }
-        logger.debug(sql);
-        return queryRunner.query(sql, countHandler, value1, value2);
+        CommonSqlDao dao = CommonSqlDao.create(entityClass, queryRunner).where().eq(field1, value1).and(field2, value2);
+        return logicDeleted?dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue()).count():dao.count();
+    }
+    
+    public Long count(String sql) {
+        
     }
 
+    /*
     protected List<T> exchangeList(List<Map> list) throws Exception {
         List<T> returnList = new ArrayList();
         for (Map map : list) {
@@ -637,7 +400,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
             returnList.add(bean);
         }
         return returnList;
-    }
+    }*/
     
     public final Class getT() {
         Type genType = getClass().getGenericSuperclass();  
@@ -679,7 +442,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
 
     public String whereValueInSql(Class clazz, Object fieldValue) {
         String type = clazz.getName();
-        if (numberTypes.contains(type)) {
+        if (SqlBeanParser.numberTypes.contains(type)) {
             return fieldValue.toString();
         } else if ("boolean".equals(type) || "java.lang.Boolean".equals(type)) {
             if (Boolean.valueOf(fieldValue.toString())) {
