@@ -77,9 +77,13 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     protected String delMarkFieldName;
     protected String delMarkFieldValue;
     
-    public JdbcDao() throws Exception {
+    public JdbcDao() {
         entityClass = getT();
-        this.sqlBeanParser = new SqlBeanParser(entityClass);
+        try {
+            this.sqlBeanParser = new SqlBeanParser(entityClass);
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
         config = JdbcDaoConfig.getConfig();
         listHandler = new BeanListHandler<>(entityClass);
         beanHandler = new BeanHandler<>(entityClass);

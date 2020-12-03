@@ -8,7 +8,6 @@ package org.shenjitang.simple.dao.jdbc;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;

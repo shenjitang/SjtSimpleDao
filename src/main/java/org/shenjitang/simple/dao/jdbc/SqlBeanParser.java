@@ -6,11 +6,13 @@
 package org.shenjitang.simple.dao.jdbc;
 
 import java.beans.BeanInfo;
+import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -58,7 +60,7 @@ public class SqlBeanParser <T> {
         numberTypes.add("java.lang.Double");
     }
     
-    public SqlBeanParser(Class<T> clazz) throws Exception {
+    public SqlBeanParser(Class<T> clazz) throws SQLException {
         this.clazz = clazz;
         config = JdbcDaoConfig.getConfig();
         //判断person对象上是否有DbTables注解
@@ -99,13 +101,17 @@ public class SqlBeanParser <T> {
             }
             fromStr.append(" from ").append(wrapField(tableName));
         }
-        BeanInfo beanInfo = Introspector.getBeanInfo(clazz);
-        PropertyDescriptor[] pda = beanInfo.getPropertyDescriptors();
-        for (PropertyDescriptor pd : pda) {
-            //logger.debug("property getDisplayName:" + pd.getDisplayName() + " getName:" + pd.getName() + " getShortDescription:" + pd.getShortDescription());
-            if (!pd.getName().equalsIgnoreCase("class")) {
-                pds.add(pd);
+        try {
+            BeanInfo beanInfo = Introspector.getBeanInfo(clazz);
+            PropertyDescriptor[] pda = beanInfo.getPropertyDescriptors();
+            for (PropertyDescriptor pd : pda) {
+                //logger.debug("property getDisplayName:" + pd.getDisplayName() + " getName:" + pd.getName() + " getShortDescription:" + pd.getShortDescription());
+                if (!pd.getName().equalsIgnoreCase("class")) {
+                    pds.add(pd);
+                }
             }
+        } catch (IntrospectionException e) {
+            throw new SQLException(e.getMessage(), e);
         }
         
         if (clazz.isAnnotationPresent(DbJoins.class)) {
@@ -122,7 +128,12 @@ public class SqlBeanParser <T> {
         for (PropertyDescriptor pd : pds){
             String aTable = tableName;
             String columnName = null;
-            Field field = clazz.getDeclaredField(pd.getName());
+            Field field = null;
+            try {
+                field = clazz.getDeclaredField(pd.getName());
+            } catch (NoSuchFieldException e) {
+                throw new SQLException(e.getMessage(), e);
+            }
             if (field.isAnnotationPresent(DbField.class)) {
                 DbField fieldAnno = field.getAnnotation(DbField.class);
                 if (StringUtils.isNotBlank(fieldAnno.value())) {

@@ -6,7 +6,6 @@
 package org.shenjitang.simple.test;
 
 import org.shenjitang.simple.dao.jdbc.CommonSqlDao;
-import org.shenjitang.simple.dao.jdbc.StatementHelper;
 
 /**
  *
