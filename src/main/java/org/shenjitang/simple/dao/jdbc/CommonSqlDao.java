@@ -37,6 +37,7 @@ public class CommonSqlDao <T> {
     //private List<String> tableList = new ArrayList();
     private JdbcDaoConfig config;
     private StringBuilder whereStr = new StringBuilder();
+    private StringBuilder tailStr = new StringBuilder();
     
     private CommonSqlDao(Class<T> clazz, QueryRunner queryRunner) throws SQLException {
         try {
@@ -148,26 +149,27 @@ public class CommonSqlDao <T> {
     
     public CommonSqlDao orderBy(String field) {
         if (!haveOrderby) {
-            whereStr.append(" order by ");
+            haveOrderby = true;
+            tailStr.append(" order by ");
         } else {
-            whereStr.append(",");
+            tailStr.append(",");
         }
-        whereStr.append(field);
+        tailStr.append(field);
         return this;
     }
     
     public CommonSqlDao desc() {
-        whereStr.append(" desc");
+        tailStr.append(" desc");
         return this;
     }
     
     public CommonSqlDao limit(Integer limit) {
-        whereStr.append(" limit ").append(limit);
+        tailStr.append(" limit ").append(limit);
         return this;
     }
     
     public CommonSqlDao limit(Integer offset, Integer limit) {
-        whereStr.append(" limit ").append(offset).append(", ").append(limit);
+        tailStr.append(" limit ").append(offset).append(", ").append(limit);
         return this;
     }
     
@@ -459,7 +461,7 @@ public class CommonSqlDao <T> {
 
     @Override
     public String toString() {
-        return sqlBeanParser.toString() + whereStr.toString();
+        return sqlBeanParser.toString() + whereStr.toString() + tailStr.toString();
     }
     
     

@@ -387,8 +387,19 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         return logicDeleted?dao.and().ne(getDelMarkFieldName(), getDelMarkFieldValue()).count():dao.count();
     }
     
-    public Long count(String sql) {
-        
+    public Long count(String sql) throws SQLException {
+        try {
+            String whereStatement = getWhereStatement(sql);
+            ScalarHandler<Long> countHandler = new ScalarHandler<>("c");
+            //sql = logicDeleted?"select count(*) as c from " + getTableName() + 
+            //        " where " + (StringUtils.isBlank(whereStatement)?"":whereStatement + " ") + " and " + getDelMarkFieldName() + "!='" + getDelMarkFieldValue() + "'":
+            //    "select count(*) as c from " + getTableName() + (StringUtils.isBlank(whereStatement)?"":" where " + whereStatement);
+            sql = "select count(*) as c from `" + sqlBeanParser.getTableName() + "`" + (StringUtils.isBlank(whereStatement)?"":" where " + whereStatement);
+            logger.debug(sql);
+            return queryRunner.query(sql, countHandler);
+        } catch (JSQLParserException e) {
+            throw new SQLException("parse sql err:" + sql, e);
+        }        
     }
 
     /*
@@ -407,153 +418,8 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         Type[] params = ((ParameterizedType) genType).getActualTypeArguments();  
         return (Class) params[0];  
     }
-    
-    public final Class getFieldType(String fieldName) {
-        if (fieldName.contains(".")) {
-            fieldName = StringUtils.substringAfter(fieldName, ".");
-        }
-        if (propertyDesriptorMap.containsKey(fieldName)) {
-            return propertyDesriptorMap.get(fieldName).getPropertyType();
-        } else if (columnDesriptorMap.containsKey(fieldName)) {
-            return columnDesriptorMap.get(fieldName).getPropertyType();
-        } else {
-            return String.class;
-        }
-        
-    }
-    
-    public String whereInSql(String fieldName, Object fieldValue) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("`").append(amendFieldName(fieldName)).append("`");
-        Class clazz = getFieldType(fieldName);
-        if (fieldValue instanceof Collection) {
-            sb.append(" in (");
-            for (Object v : (Collection) fieldValue) {
-                sb.append(whereValueInSql(clazz, v)).append(",");
-            }
-            sb.deleteCharAt(sb.length() - 1);
-            sb.append(")");
-        } else {
-            sb.append("=");
-            sb.append(whereValueInSql(clazz, fieldValue));
-        }
-        return sb.toString();
-    }
 
-    public String whereValueInSql(Class clazz, Object fieldValue) {
-        String type = clazz.getName();
-        if (SqlBeanParser.numberTypes.contains(type)) {
-            return fieldValue.toString();
-        } else if ("boolean".equals(type) || "java.lang.Boolean".equals(type)) {
-            if (Boolean.valueOf(fieldValue.toString())) {
-                return "1";
-            } else {
-                return "0";
-            }
-        } else {
-            return "'" + fieldValue.toString() + "'";
-        }
-    } 
     
-    protected String getInsertSql() {
-        if (insertSql == null) {
-            StringBuilder sb = new StringBuilder();
-            StringBuilder tailSb = new StringBuilder("?");
-            sb.append("insert into `").append(JdbcDao.this.getTableName()).append("` (`").append(columnNames[0]).append("`");
-            for (int i = 1; i < columnNames.length; i++) {
-                sb.append(", ").append("`").append(columnNames[i]).append("`");
-                tailSb.append(",?");
-            }
-            sb.append(") values (").append(tailSb).append(")");
-            insertSql = sb.toString();
-        }
-        return insertSql;
-    }
-    
-    protected String getInsertSqlNoId() {
-        if (insertSqlNoId == null) {
-            StringBuilder sb = new StringBuilder();
-            StringBuilder tailSb = new StringBuilder("?");
-            sb.append("insert into `").append(JdbcDao.this.getTableName()).append("` (`").append(columnNames[0]).append("`");
-            for (int i = 1; i < columnNames.length; i++) {
-                if (!"id".equalsIgnoreCase(columnNames[i])) {
-                    sb.append(", ").append("`").append(columnNames[i]).append("`");
-                    tailSb.append(",?");
-                }
-            }
-            sb.append(") values (").append(tailSb).append(")");
-            insertSqlNoId = sb.toString();
-        }
-        return insertSqlNoId;
-    }
-
-    protected String getUpdateSql(String findField) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("update `").append(JdbcDao.this.getTableName()).append("` set `").append(columnNames[0]).append("`=?");
-        for (int i = 1; i < columnNames.length; i++) {
-            sb.append(", `").append(columnNames[i]).append("`=?");
-        }
-        sb.append(" where `").append(findField).append("`=?");
-        return sb.toString();
-    }
-
-    protected String getUpdateSql(String findField, List fields) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("update `").append(JdbcDao.this.getTableName()).append("` set `").append(fields.get(0)).append("`=?");
-        for (int i = 1; i < fields.size(); i++) {
-            sb.append(", `").append(fields.get(i)).append("`=?");
-        }
-        sb.append(" where `").append(findField).append("`=?");
-        return sb.toString();
-    }
-
-    protected String getUpdateSql(String findField, String findField2) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("update `").append(JdbcDao.this.getTableName()).append("` set `").append(columnNames[0]).append("`=?");
-        for (int i = 1; i < columnNames.length; i++) {
-            sb.append(", `").append(columnNames[i]).append("`=?");
-        }
-        sb.append(" where `").append(findField).append("`=? and `").append(findField2).append("`=?");
-        return sb.toString();
-    }
-
-    protected String createConditionSegment(Map map) {
-        StringBuilder sb = new StringBuilder();
-        int i = 0;
-        for (Object key : map.keySet()) {
-            if (i++ > 0) {
-                sb.append(" and ");
-            }
-            sb.append(whereInSql((String)key, map.get(key)));
-            //sb.append("`").append(key.toString()).append("`").append("='").append(map.get(key).toString()).append("'");
-        }
-        return sb.toString();
-    }
-    
-    
-    private boolean isNnderlineFieldName() {
-        return JdbcDaoConfig.getConfig().getFieldNameSplit() == NAME_SPLIT_UNDERLINE;
-    }
-    String amendFieldName(String name) {
-        if (name.contains(".")) {
-            name = StringUtils.substringAfter(name, ".");
-        }
-        if (columnToPropertyOverrides.containsKey(name)) {
-            return name;
-        }
-        name = PropertyToColumnOverrides.get(name);
-        if (StringUtils.isNotBlank(name)) return name;
-        throw new RuntimeException("字段" + name + "不存在");
-        //return isNnderlineFieldName()? CamelUnderLineUtils.camelToUnderline(name) : name;
-    }
-    
-    String amendTableName(String name) {
-        if (JdbcDaoConfig.getConfig().getTableNameSplit() == NAME_SPLIT_UNDERLINE)
-            return CamelUnderLineUtils.camelToUnderline(name);
-        else 
-            return name;
-    }
-
     public Boolean getLogicDeleted() {
         return logicDeleted;
     }
@@ -587,31 +453,6 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
         Map map = new HashMap();
         map.put(name, value);
         return map;
-    }
-
-    private static SqlStruct parseSql(String sql) throws JSQLParserException {
-        SqlStruct sqlStruct = new SqlStruct();
-        CCJSqlParserManager parserManager = new CCJSqlParserManager();
-        Statement statement = parserManager.parse(new StringReader(sql));
-        if (statement instanceof Select) {
-            Select select = (Select) statement;
-            PlainSelect selectBody = (PlainSelect) select.getSelectBody();
-            sqlStruct.setCommand("select");
-            sqlStruct.setWhereStatement(selectBody.getWhere().toString());
-        } else if (statement instanceof Delete) {
-            Delete delete = (Delete) statement;
-            sqlStruct.setCommand("delete");
-            sqlStruct.setWhereStatement(delete.getWhere().toString());
-        } else if (statement instanceof Update) {
-            Update update = (Update) statement;
-            sqlStruct.setCommand("update");
-            sqlStruct.setWhereStatement(update.getWhere().toString());
-        } else if (statement instanceof Insert) {
-            sqlStruct.setCommand("insert");
-        } else {
-            throw new JSQLParserException("不支持的sql语句:" + sql);
-        }
-        return sqlStruct;
     }
     
     private static String getWhereStatement(String sql) throws JSQLParserException {
