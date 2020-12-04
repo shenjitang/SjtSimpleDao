@@ -13,7 +13,7 @@ import org.shenjitang.simple.dao.jdbc.CommonSqlDao;
  */
 public class NewHelperTest {
     public static void main(String[] args) throws Exception {
-        CommonSqlDao helper = CommonSqlDao.create(QueryBean.class, null);
-        System.out.println(helper.toString());
+        CommonSqlDao dao = CommonSqlDao.create(QueryBean.class, null);
+        System.out.println(dao.toString());
     }
 }
