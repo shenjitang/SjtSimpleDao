@@ -63,7 +63,8 @@ testDao.remove("name", "world");
 ## 二、Mysql，CommonSqlDao的用法
 先上代码，一个非常复杂的查询，用一个非常简单的方式实现。同时有一对多，多对一，多对多
 ```
-List<UserTable> list = CommonSqlDao.create(UserTable.class, queryRunner).where().eq("gender", "male").find();
+List<UserTable> list = CommonSqlDao.create(UserTable.class, queryRunner)
+.where().eq("gender", "male").find();
 
 ```
 这就查完了，那么一对多，多对一，多对多在哪里呢？
@@ -99,54 +100,9 @@ public class UserTable {
     public void setUserId(int userId) {
         this.userId = userId;
     }
+//get set
+......
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getRoleName() {
-        return roleName;
-    }
-
-    public void setRoleName(String roleName) {
-        this.roleName = roleName;
-    }
-
-    public String getClassName() {
-        return className;
-    }
-
-    public void setClassName(String className) {
-        this.className = className;
-    }
-
-    public List<Contact> getContact() {
-        return contact;
-    }
-
-    public void setContact(List<Contact> contact) {
-        this.contact = contact;
-    }
-
-    public String getLalala() {
-        return lalala;
-    }
-
-    public void setLalala(String lalala) {
-        this.lalala = lalala;
-    }
-
-    public List<GroupTable> getGroups() {
-        return groups;
-    }
-
-    public void setGroups(List<GroupTable> groups) {
-        this.groups = groups;
-    }
         
 }
 ```
