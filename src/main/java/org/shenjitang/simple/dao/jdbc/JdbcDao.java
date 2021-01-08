@@ -253,16 +253,7 @@ public abstract class JdbcDao <T> implements BaseDao<T> {
     public T get(Object id) throws Exception {
         return (T)CommonSqlDao.create(entityClass, queryRunner).where().eq("id", id).findOne();
     }
-    
-    @Override
-    public T findOne(Object id) throws Exception {
-        CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().eq("id", id);
-        if (logicDeleted) {
-            dao.and(getDelMarkFieldName(), getDelMarkFieldValue());
-        }
-        return dao.findOne();
-    }
-    
+        
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
         CommonSqlDao<T> dao = CommonSqlDao.create(entityClass, queryRunner).where().eq(fieldName, value);

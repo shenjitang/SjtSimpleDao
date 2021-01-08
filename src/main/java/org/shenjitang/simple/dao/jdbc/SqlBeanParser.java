@@ -42,6 +42,8 @@ public class SqlBeanParser <T> {
     private Class<T> clazz;
     private String tableName = null;
     private List<DbFieldInfo> fieldList = new ArrayList();
+    private Set<String> columnNameSet = new HashSet();
+    private Set<String> fieldNameSet = new HashSet();
     private List<LinkFieldInfo> linkList = new ArrayList();
     private JdbcDaoConfig config;
     private Field[] fields = null;
@@ -145,6 +147,8 @@ public class SqlBeanParser <T> {
                     aTable = fieldAnno.table();
                 }
                 DbFieldInfo fieldInfo = new DbFieldInfo(aTable, columnName, field.getName(), field.getType());
+                columnNameSet.add(columnName);
+                fieldNameSet.add(field.getName());
                 fieldList.add(fieldInfo);
             } else if (field.isAnnotationPresent(DbLink.class)){
                 DbLink linkAnno = field.getAnnotation(DbLink.class);
@@ -168,6 +172,8 @@ public class SqlBeanParser <T> {
                     columnName = field.getName();
                 }
                 DbFieldInfo fieldInfo = new DbFieldInfo(aTable, columnName, field.getName(), field.getType());
+                columnNameSet.add(columnName);
+                fieldNameSet.add(field.getName());
                 fieldList.add(fieldInfo);
             }
         }   
@@ -276,4 +282,11 @@ public class SqlBeanParser <T> {
         return tableName;
     }
     
+    public boolean containsColumn(String name) {
+        return columnNameSet.contains(name);
+    }
+    
+    public boolean containsField(String name) {
+        return fieldNameSet.contains(name);
+    }
 }

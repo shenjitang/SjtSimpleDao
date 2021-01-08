@@ -14,14 +14,21 @@ import org.shenjitang.simple.dao.utils.CamelUnderLineUtils;
 import org.shenjitang.mongodbutils.MongoDbOperater;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.sf.jsqlparser.JSQLParserException;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang.StringUtils;
 import org.bson.Document;
+import org.shenjitang.mongodbutils.QueryInfo;
+import org.shenjitang.simple.dao.jdbc.JdbcDaoConfig;
+import org.shenjitang.simple.dao.jdbc.SqlBeanParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -29,12 +36,20 @@ import org.bson.Document;
  * @param <T>
  */
 public abstract class MongodbDao <T> implements BaseDao<T> {
+    private static final Logger logger = LoggerFactory.getLogger(MongodbDao.class);
+    protected SqlBeanParser<T> sqlBeanParser;
     protected MongoDbOperater mongoDbOperation;
     protected String dbName;
     protected String colName;
     private Class tClazz;
 
     public MongodbDao() {
+        try {
+            JdbcDaoConfig.getConfig().setFieldNameSplit(JdbcDaoConfig.NAME_SPLIT_ORIGINAL);
+            this.sqlBeanParser = new SqlBeanParser(getT());
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
     }
     
     public MongoDatabase getDatabase() {
@@ -113,12 +128,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     public T get(Object id) throws Exception {
         return (T)mongoDbOperation.findOne(getT(), dbName, getColName(), Filters.eq("_id", id));
     }
-    
-    @Override
-    public T findOne(Object id) throws Exception {
-        return get(id);
-    }
-    
+        
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
         return (T)mongoDbOperation.findOne(getT(), dbName, getColName(), Filters.eq(fieldName, value));
@@ -148,7 +158,8 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
 
     @Override
     public List<T> find(Map queryMap) throws Exception {
-        return mongoDbOperation.findByKeyValue(getT(), dbName, colName, getColName(), queryMap);
+        List<Document> list = mongoDbOperation.find(dbName, getColName(), queryMap);
+        return exchangeList(list);
     }
 
     @Override
@@ -166,11 +177,28 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     public Long count(Map queryMap){
         return  mongoDbOperation.count(dbName,getColName(),queryMap);
     }
+    
+    public Long count(String sql) throws JSQLParserException {
+        QueryInfo queryInfo = mongoDbOperation.sql2QueryInfo(dbName, sql);
+        return mongoDbOperation.getDatabase(dbName).getCollection(getColName()).countDocuments(queryInfo.query);
+    }
+    
+    public Long count(String sql, Object... parameters) throws JSQLParserException {
+        QueryInfo queryInfo = mongoDbOperation.sql2QueryInfo(dbName, sql, parameters);
+        return mongoDbOperation.getDatabase(dbName).getCollection(getColName()).countDocuments(queryInfo.query);
+    }
 
     protected List<T> exchangeList(List<Document> list) throws Exception {
         List<T> returnList = new ArrayList();
         for (Document map : list) {
             T bean = (T)getT().newInstance();
+            if (map.containsKey("_id") && (!map.containsKey("id"))) {
+                //logger.info("add id by _id value=" + map.get("_id"));
+                map.put("id", map.get("_id"));
+            }
+            for (Object key : map.keySet()) {
+                //logger.info("******* " + key + "=" + map.get(key));
+            }
             BeanUtils.populate(bean, map);
             returnList.add(bean);
         }
@@ -178,7 +206,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     }
     
     public void update(Map findObj, Map setMap) throws Exception {
-        mongoDbOperation.update(dbName, getColName(), findObj, setMap);
+        mongoDbOperation.update(dbName, getColName(), findObj, checkColumnName(setMap));
     }
     
     @Override
@@ -199,15 +227,15 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
     
     @Override
     public void update(Map map ,String findField, Object findValue) throws Exception {
-        mongoDbOperation.update(dbName, colName, Filters.eq(findField, findValue), map);
+        mongoDbOperation.update(dbName, colName, Filters.eq(findField, findValue), checkColumnName(map));
     }
     
     public void updateOne(Map map ,String findField, Object findValue) throws Exception {
-        mongoDbOperation.updateOne(dbName, colName, Filters.eq(findField, findValue), map);
+        mongoDbOperation.updateOne(dbName, colName, Filters.eq(findField, findValue), checkColumnName(map));
     }
 
     public void updateById(Map map ,Object id) throws Exception {
-        mongoDbOperation.updateOne(dbName, colName, Filters.eq("_id", id), map);
+        mongoDbOperation.updateOne(dbName, colName, Filters.eq("_id", id), checkColumnName(map));
     }
 
     protected Class getGenericType(int index) {
@@ -230,5 +258,25 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
             tClazz = getGenericType(0);
         }
         return tClazz;
+    }
+    
+    public Map checkColumnName(Map map) {
+        Map resultMap = new HashMap();
+        for (Object field : map.keySet()) {
+            String fieldStr = (String)field;
+            if (sqlBeanParser.containsField(fieldStr)) {
+                resultMap.put(field, map.get(field));
+            } else {
+                logger.warn(dbName + "." + colName + "." + fieldStr + " not exist!");
+            }
+        }
+        return resultMap;
+    }
+    public String checkColumnName(String name) {
+        if (sqlBeanParser.containsField(name)) {
+            return name;
+        } else {
+            throw new RuntimeException("no such field:" + name);
+        }
     }
 }
