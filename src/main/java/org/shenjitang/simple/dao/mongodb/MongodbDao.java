@@ -24,6 +24,7 @@ import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang.StringUtils;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.shenjitang.mongodbutils.QueryInfo;
 import org.shenjitang.simple.dao.jdbc.JdbcDaoConfig;
 import org.shenjitang.simple.dao.jdbc.SqlBeanParser;
@@ -129,6 +130,13 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         return (T)mongoDbOperation.findOne(getT(), dbName, getColName(), Filters.eq("_id", id));
     }
         
+    /**
+     * 根据 id 查询数据
+     */
+    public <V> V get(String id ,Class<V> clazz) throws Exception {
+        return this.mongoDbOperation.findOne(clazz, this.dbName, this.getColName(), Filters.eq("_id", id));
+    }
+
     @Override
     public T findOne(String fieldName, Object value) throws Exception {
         return (T)mongoDbOperation.findOne(getT(), dbName, getColName(), Filters.eq(fieldName, value));
@@ -161,6 +169,16 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         List<Document> list = mongoDbOperation.find(dbName, getColName(), queryMap);
         return exchangeList(list);
     }
+    /**
+     * Map 条件查询
+     */
+    public <V> List<V> find(Map queryMap , Class<V> clazz) throws Exception {
+        if (queryMap.containsKey("id") && !queryMap.containsKey("_id")) {
+            queryMap.put("_id", queryMap.get("id"));
+        }
+        List<Document> list = this.mongoDbOperation.find(this.dbName, this.getColName(), queryMap);
+        return exchangeList(list,clazz);
+    }
 
     @Override
     public List<T> findAll() throws Exception {
@@ -168,9 +186,73 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         return exchangeList(list);
     }
 
+    public <V> List<V> find(Bson query, Bson order, int start, int limit, Class<V> clazz) throws Exception {
+        List<Document> list = this.mongoDbOperation.find(getCollection(), query, order, start, limit);
+        return exchangeList(list, clazz);
+    }
+
+    /**
+     * 无指定排序，分页
+     */
+    public <V> List<V> find(Bson query, int start, int limit, Class<V> clazz) throws Exception {
+        return find(query,null, start, limit, clazz);
+    }
+
+    /**
+     * 指定排序，查询所有
+     */
+    public <V> List<V> findAll(Bson query, Bson order, Class<V> clazz) throws Exception {
+        return find(query, order, 0, 0, clazz);
+    }
+
+    /**
+     * 无指定排序，查询所有
+     */
+    public <V> List<V> findAll(Bson query, Class<V> clazz) throws Exception {
+        return find(query,null, 0, 0, clazz);
+    }
+
+
+    /**
+     * 查询，分页
+     */
+    public List<T> find(Bson query, Bson order, int start, int limit) throws Exception {
+        List<Document> list = this.mongoDbOperation.find(getCollection(), query, order, start, limit);
+        return exchangeList(list);
+    }
+
+    /**
+     * 无指定排序，分页
+     */
+    public  List<T> find(Bson query, int start, int limit) throws Exception {
+        return find(query,null, start, limit);
+    }
+
+    /**
+     * 指定排序，查询所有
+     */
+    public  List<T> findAll(Bson query, Bson order) throws Exception {
+        return find(query,order, 0, 0);
+    }
+
+    /**
+     * 无指定排序，查询所有
+     */
+    public  List<T> findAll(Bson query) throws Exception {
+        return find(query,null, 0, 0);
+    }
+    
     @Override
     public Long count(){
         return  mongoDbOperation.count(dbName,getColName());
+    }
+
+    public Long count(Bson bson)throws Exception{
+        if (bson==null){
+            return  getCollection().countDocuments();
+        }else {
+            return getCollection().countDocuments(bson);
+        }
     }
 
     @Override
@@ -193,11 +275,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         for (Document map : list) {
             T bean = (T)getT().newInstance();
             if (map.containsKey("_id") && (!map.containsKey("id"))) {
-                //logger.info("add id by _id value=" + map.get("_id"));
                 map.put("id", map.get("_id"));
-            }
-            for (Object key : map.keySet()) {
-                //logger.info("******* " + key + "=" + map.get(key));
             }
             BeanUtils.populate(bean, map);
             returnList.add(bean);
@@ -205,6 +283,25 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         return returnList;
     }
     
+    /**
+     * 集合类型转换
+     */
+    protected  <V> List<V> exchangeList(List<Document> list,Class<V> clazz) throws Exception {
+        List<V> returnList = new ArrayList<>();
+        if (clazz == null) {
+            clazz = getT();
+        }
+        for (Document map : list) {
+            V bean = clazz.newInstance();
+            if (map.containsKey("_id") && !map.containsKey("id")) {
+                map.put("id", map.get("_id"));
+            }
+            BeanUtils.populate(bean, map);
+            returnList.add(bean);
+        }
+        return returnList;
+    }
+
     public void update(Map findObj, Map setMap) throws Exception {
         mongoDbOperation.update(dbName, getColName(), findObj, checkColumnName(setMap));
     }
@@ -238,6 +335,12 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         mongoDbOperation.updateOne(dbName, colName, Filters.eq("_id", id), checkColumnName(map));
     }
 
+    public void updateById(String field, String value ,Object id) throws Exception {
+        Map map = new HashMap();
+        map.put(field, value);
+        mongoDbOperation.updateOne(dbName, colName, Filters.eq("_id", id), checkColumnName(map));
+    }
+    
     protected Class getGenericType(int index) {
         Type genType = getClass().getGenericSuperclass();
         if (!(genType instanceof ParameterizedType)) {
