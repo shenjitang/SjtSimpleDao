@@ -9,6 +9,11 @@ package org.shenjitang.simple.dao.mongodb;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import java.beans.BeanInfo;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import org.shenjitang.simple.dao.BaseDao;
 import org.shenjitang.simple.dao.utils.CamelUnderLineUtils;
 import org.shenjitang.mongodbutils.MongoDbOperater;
@@ -16,9 +21,12 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.sf.jsqlparser.JSQLParserException;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.PropertyUtils;
@@ -269,23 +277,62 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         QueryInfo queryInfo = mongoDbOperation.sql2QueryInfo(dbName, sql, parameters);
         return mongoDbOperation.getDatabase(dbName).getCollection(getColName()).countDocuments(queryInfo.query);
     }
-
-    protected List<T> exchangeList(List<Document> list) throws Exception {
-        List<T> returnList = new ArrayList();
+    
+    public final static <V> List<V> exchangeList(List<Document> list, Class<V> clazz) throws Exception {
+        List<V> returnList = new ArrayList();
         for (Document map : list) {
-            T bean = (T)getT().newInstance();
+            V bean = clazz.newInstance();
             if (map.containsKey("_id") && (!map.containsKey("id"))) {
                 map.put("id", map.get("_id"));
             }
+            Map<String, Collection> collectionFieldMap = new HashMap();
+            for (String key : map.keySet()) {
+                Object value = map.get(key);
+                if (value instanceof Collection) {
+                    collectionFieldMap.put(key, (Collection)value);
+                }
+            }
+            if (!collectionFieldMap.isEmpty()) {
+                for (String key : collectionFieldMap.keySet()) {
+                    map.remove(key);
+                }
+            }
             BeanUtils.populate(bean, map);
+            if (!collectionFieldMap.isEmpty()) {
+                for (String key : collectionFieldMap.keySet()) {
+                    Field field = clazz.getDeclaredField(key);
+                    Class fieldClass = field.getType();
+                    String fieldClassName = fieldClass.getName();
+                    Collection fieldValue = null;
+                    if (fieldClass.isInterface()) { //如果是接口
+                        if (fieldClassName.equals("java.util.List")) {
+                            fieldValue = new ArrayList();
+                        } else if (fieldClassName.equals("java.util.Set")) {
+                            fieldValue = new HashSet();
+                        } else {
+                            throw new RuntimeException("不支持的集合类型，请使用List或Set");
+                        }
+                    } else {
+                        fieldValue = (Collection)fieldClass.newInstance();
+                    }
+                    fieldValue.addAll(collectionFieldMap.get(key));
+                    field.setAccessible(true);
+                    field.set(bean, fieldValue);
+                }
+            }
             returnList.add(bean);
         }
         return returnList;
+    }
+
+    protected List<T> exchangeList(List<Document> list) throws Exception {
+        return exchangeList(list, getT());
     }
     
     /**
      * 集合类型转换
      */
+    /*
     protected  <V> List<V> exchangeList(List<Document> list,Class<V> clazz) throws Exception {
         List<V> returnList = new ArrayList<>();
         if (clazz == null) {
@@ -301,7 +348,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         }
         return returnList;
     }
-
+    */
     public void update(Map findObj, Map setMap) throws Exception {
         mongoDbOperation.update(dbName, getColName(), findObj, checkColumnName(setMap));
     }
@@ -335,7 +382,7 @@ public abstract class MongodbDao <T> implements BaseDao<T> {
         mongoDbOperation.updateOne(dbName, colName, Filters.eq("_id", id), checkColumnName(map));
     }
 
-    public void updateById(String field, String value ,Object id) throws Exception {
+    public void updateById(String field, Object value ,Object id) throws Exception {
         Map map = new HashMap();
         map.put(field, value);
         mongoDbOperation.updateOne(dbName, colName, Filters.eq("_id", id), checkColumnName(map));
