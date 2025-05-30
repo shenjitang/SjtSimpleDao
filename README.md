@@ -1,6 +1,7 @@
 # SjtSimpleDao
 一个基于 apache commons-dbutils 的非常简单实用的Dao实现。   
 目前支持jdbc数据库和mongodb。简单的修改dao类的父类即可切换关系型数据库和mongodb数据库。   
+
 ## 一、快速掌握（Spring Ioc + Dao方式)
 ### Spring中配置：DataSource，queryRunner 和 dao类。
 ```
